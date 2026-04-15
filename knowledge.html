@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>知识库 - DecisionOne</title>
+<style>
+:root { --primary-blue: #1A73E8; --primary-blue-light: #E8F0FE; --primary-black: #1E293B; }
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+body { background: #F8FAFC; height: 100vh; display: flex; color: #1E293B; overflow: hidden; -webkit-font-smoothing: antialiased; }
+.icon { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 14px; height: 14px; }
+.icon-lg { width: 20px; height: 20px; }
+/* ================= 侧边栏重构 (Manus 风格) ================= */
+.global-toolbar { width: 68px; background: #FFFFFF; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow-x: hidden; overflow-y: hidden; white-space: nowrap; z-index: 100; flex-shrink: 0;}
+.global-toolbar.expanded { width: 260px; }
+.global-toolbar:hover { overflow-y: auto; }
+.global-toolbar::-webkit-scrollbar { width: 4px; }
+.global-toolbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+.tb-header { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 16px; margin-bottom: 8px; position: relative; }
+.global-toolbar:not(.expanded) .tb-header { justify-content: center; }
+.tb-logo-box { display: flex; align-items: center; gap: 10px; color: var(--primary-black); font-weight: 700; font-size: 16px; text-decoration: none; transition: opacity 0.2s; }
+.global-toolbar:not(.expanded) .tb-logo-box span { display: none; }
+.global-toolbar:not(.expanded) .tb-logo-box { justify-content: center; width: 100%; }
+.global-toolbar:not(.expanded) .sidebar-toggle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
+.global-toolbar:not(.expanded) .tb-header:hover .tb-logo-box { opacity: 0; }
+.global-toolbar:not(.expanded) .tb-header:hover .sidebar-toggle { opacity: 1; pointer-events: auto; background: #F1F5F9; }
+.sidebar-toggle { background: transparent; border: none; cursor: pointer; color: #64748B; padding: 6px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: 0.2s; outline: none; }
+.sidebar-toggle:hover { background: #F1F5F9; color: var(--primary-black); }
+.tb-nav { padding: 0 12px; margin-bottom: 24px; }
+.tb-item { display: flex; align-items: center; color: #1E293B; text-decoration: none; padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; transition: 0.2s; font-weight: 500; cursor: pointer; font-size: 14px; }
+.global-toolbar:not(.expanded) .tb-item { justify-content: center; padding: 12px 0; }
+.tb-item:hover { background: #F1F5F9; }
+.tb-item.active { background: var(--primary-blue-light); color: var(--primary-blue); }
+.tb-item svg { flex-shrink: 0; }
+.global-toolbar.expanded .tb-item svg { margin-right: 12px; }
+.global-toolbar:not(.expanded) .tb-item span { display: none; }
+.collapsed-history-btn { display: none !important; }
+.global-toolbar:not(.expanded) .collapsed-history-btn { display: flex !important; }
+.history-section { display: flex; flex-direction: column; padding: 0 12px; opacity: 1; transition: opacity 0.2s; }
+.global-toolbar:not(.expanded) .history-section { display: none; }
+.history-header { font-size: 14px; color: #64748B; font-weight: 600; padding: 0 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+.history-arrow-icon { transition: transform 0.3s; }
+.history-arrow-icon.collapsed { transform: rotate(-90deg); }
+.history-search { display: flex; align-items: center; background: #F8FAFC; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin: 0 0 12px 0; gap: 8px; color: #64748B; transition: 0.2s; }
+.history-search:focus-within { border-color: #CBD5E1; background: #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+.history-search input { border: none; background: transparent; outline: none; width: 100%; font-size: 13px; color: #1E293B; }
+.history-list { display: flex; flex-direction: column; gap: 2px; }
+.hist-item { font-size: 14px; color: #1E293B; padding: 10px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+.hist-item:hover { background: #F1F5F9; }
+
+/* ================= 底部用户信息区 ================= */
+.user-profile { margin-top: auto; padding: 16px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #E2E8F0; cursor: pointer; transition: 0.2s; }
+.user-profile:hover { background: #F1F5F9; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-black); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; font-size: 14px; }
+.user-name { font-size: 14px; font-weight: 500; color: #1E293B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.global-toolbar:not(.expanded) .user-profile { padding: 16px 0; justify-content: center; }
+.global-toolbar:not(.expanded) .user-name { display: none; }
+
+.wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.header { height: 60px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 14px; flex-shrink: 0; z-index: 50;}
+.header-tabs { display: flex; gap: 24px; height: 100%; }
+.header-tab { cursor: pointer; color: #64748B; padding: 0 4px; border-bottom: 2px solid transparent; display: flex; align-items: center; font-weight: 500; transition: 0.2s; }
+.header-tab.active { color: var(--primary-blue); border-bottom-color: var(--primary-blue); font-weight: bold; }
+.actions { display: flex; gap: 12px; align-items: center;}
+.nl-input { display: flex; position: relative; align-items: center;}
+.nl-input input { width: 200px; padding: 8px 12px 8px 32px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; background: #FAFAFB; font-size: 13px; transition: 0.2s; color: #1E293B; }
+.nl-input input:focus { border-color: var(--primary-blue); background: #FFFFFF; box-shadow: 0 0 0 3px var(--primary-blue-light); }
+.nl-input svg { position: absolute; left: 10px; color: #94A3B8; }
+.btn { padding: 0 16px; height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 8px; border: 1px solid var(--primary-black); cursor: pointer; font-size: 13px; font-weight: 500; color: white; background: var(--primary-black); transition: 0.2s; outline: none; }
+.btn:hover { background: #334155; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+
+/* ==== 修正网格被撑开导致的遮挡不全 ==== */
+.kb-body { flex: 1; padding: 24px; overflow-y: auto; overflow-x: hidden; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 10px; align-content: start;}
+
+.folder { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+.folder-title { font-weight: bold; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #1E293B;}
+
+/* ==== 不同类型的标签样式颜色不同 ==== */
+.folder-tag { font-size: 11px; padding: 3px 10px; border-radius: 6px; font-weight: 500;}
+.tag-general { background: var(--primary-blue-light); color: var(--primary-blue); }
+.tag-law { background: #E6F4EA; color: #137333; }
+.tag-politics { background: #F3E8FD; color: #7E22CE; }
+.tag-economy { background: #FFEDD5; color: #C2410C; }
+
+/* ==== 最多展示15条内容，展示不下右侧有滚轮 ==== */
+.doc-list { max-height: 405px; overflow-y: auto; padding-right: 4px; }
+.doc-list::-webkit-scrollbar { width: 4px; }
+.doc-list::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+/* ==== 段落间距调整小一点 ==== */
+.doc-item { font-size: 13px; color: #475569; padding: 5px 0; border-bottom: 1px dashed #F1F5F9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: 0.2s;}
+.doc-item:hover { color: var(--primary-blue); }
+.doc-item:last-child { border-bottom: none; }
+
+/* ==== 收藏(星星)按钮仅在悬停时展示 ==== */
+.star-btn { cursor: pointer; color: #CBD5E1; transition: opacity 0.2s, color 0.2s; flex-shrink: 0; opacity: 0; }
+.doc-item:hover .star-btn { opacity: 1; }
+.star-btn.active { fill: #F59E0B; color: #F59E0B; opacity: 1; }
+
+/* ==== 上传弹窗规范样式 ==== */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(2px); display: none; align-items: center; justify-content: center; z-index: 999; }
+.modal { background: #FFFFFF; border-radius: 12px; width: 420px; max-width: 90%; box-shadow: 0 10px 30px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; animation: modalFadeIn 0.2s ease-out; }
+@keyframes modalFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.modal-header { padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; font-weight: 600; color: var(--primary-black); font-size: 15px; }
+.modal-close { cursor: pointer; color: #64748B; transition: 0.2s; }
+.modal-close:hover { color: var(--primary-black); }
+.modal-body { padding: 24px 20px; display: flex; flex-direction: column; gap: 16px; }
+.upload-area { border: 2px dashed #CBD5E1; border-radius: 8px; padding: 40px 20px; text-align: center; color: #64748B; cursor: pointer; transition: 0.2s; background: #F8FAFC; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.upload-area:hover { border-color: var(--primary-blue); background: var(--primary-blue-light); color: var(--primary-blue); }
+.modal-footer { padding: 16px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 12px; background: #F8FAFC; }
+.btn-outline { background: #FFFFFF; border: 1px solid #CBD5E1; color: #475569; }
+.btn-outline:hover { background: #F1F5F9; border-color: #94A3B8; box-shadow: none; color: #1E293B; }
+
+/* ==== 我的报告专用卡片样式 ==== */
+.report-item { display: flex; flex-direction: column; padding: 20px; border: 1px solid #E2E8F0; border-radius: 12px; background: #FFFFFF; cursor: pointer; transition: 0.2s; text-align: left; }
+.report-item:hover { border-color: var(--primary-blue); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+.report-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid #F1F5F9; padding-bottom: 16px; }
+.report-header-left { display: flex; align-items: center; gap: 12px; overflow: hidden; }
+.report-header-icon { width: 24px; height: 24px; flex-shrink: 0; }
+.report-title { font-size: 16px; font-weight: 600; color: #1E293B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.report-meta-info { font-size: 13px; color: #475569; line-height: 1.8; margin-bottom: 16px; }
+.star-rating { color: #F59E0B; letter-spacing: 2px; font-size: 14px; }
+.report-summary-title { font-size: 15px; font-weight: bold; color: #1E293B; margin-bottom: 8px; }
+.report-summary-text { font-size: 13.5px; color: #334155; line-height: 1.6; margin-bottom: 20px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+.report-faded-section { font-size: 14px; font-weight: 600; color: #CBD5E1; display: flex; align-items: center; gap: 8px; }
+.report-faded-section::before { content: "—"; color: #CBD5E1; }
+
+/* ==== 我的报告 列表模式覆盖样式 (精细化间距与对齐优化) ==== */
+#report-list-container.list-view {
+    display: block !important;
+    max-height: 405px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+#report-list-container.list-view .report-item {
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 0;
+    border: none;
+    border-bottom: 1px dashed #F1F5F9;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    gap: 8px;
+}
+#report-list-container.list-view .report-item:last-child {
+    border-bottom: none;
+}
+#report-list-container.list-view .report-header {
+    margin: 0;
+    padding: 0;
+    border: none;
+    flex: 1;
+    display: grid;
+    grid-template-columns: 350px 90px 90px;
+    align-items: center;
+    gap: 40px; 
+    justify-content: flex-start;
+}
+#report-list-container.list-view .report-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: 20px; 
+    overflow: hidden;
+}
+#report-list-container.list-view .report-header-icon {
+    display: block !important; 
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+#report-list-container.list-view .report-title {
+    font-size: 13px;
+    font-weight: normal;
+    color: #475569;
+    transition: 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#report-list-container.list-view .report-item:hover .report-title {
+    color: var(--primary-blue);
+}
+#report-list-container.list-view .report-meta-info,
+#report-list-container.list-view .report-summary-title,
+#report-list-container.list-view .report-summary-text,
+#report-list-container.list-view .report-faded-section,
+#report-list-container.list-view .report-options-icon {
+    display: none;
+}
+#report-list-container.list-view .report-list-score {
+    display: block !important;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: #F59E0B;
+    text-align: left; 
+}
+#report-list-container.list-view .report-list-date {
+    display: block !important;
+    color: #94A3B8;
+    font-size: 12px;
+    text-align: left; 
+}
+</style>
+</head>
+<body>
+<!-- 工具栏默认去除 expanded 类，实现默认收起 -->
+<div class="global-toolbar" id="toolbar">
+<div class="tb-header">
+<a href="home.html" class="tb-logo-box" title="DecisionOne 首页">
+<svg class="icon icon-lg" style="color:var(--primary-black);" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 18C4.686 18 2 15.314 2 12c0-3.314 2.686-6 6-6 2.5 0 4.8 1.5 5.5 3.5"></path>
+<path d="M16 6c3.314 0 6 2.686 6 6 0 3.314-2.686 6-6 6-2.5 0-4.8-1.5-5.5-3.5"></path>
+</svg>
+<span>DecisionOne</span>
+</a>
+<!-- title 初始状态调整为 展开边栏 -->
+<button id="sidebar-toggle-btn" class="sidebar-toggle" onclick="toggleToolbar()" title="展开边栏">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+</button>
+</div>
+<div class="tb-nav">
+<a href="home.html" class="tb-item">
+<svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<span>新建任务</span>
+</a>
+<a href="knowledge.html" class="tb-item active">
+<svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+<span>知识库</span>
+</a>
+<div class="tb-item collapsed-history-btn" onclick="toggleToolbar()" title="历史任务">
+<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+</div>
+</div>
+<div class="history-section">
+<div class="history-header">
+<div style="display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="toggleHistoryList()">
+<span>历史任务</span>
+<svg id="history-arrow" class="icon icon-sm history-arrow-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+<svg class="icon icon-sm" style="cursor: pointer;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+</div>
+<div class="history-list" id="history-list-container">
+<div class="hist-item" onclick="window.location.href='workspace.html'">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+菲律宾仁爱礁强行运补事件推演
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+关税后续问题推演评估及应对
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+中东原油市场短期走势预测分析
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+东海防空识别区常态化巡航评估
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+半导体供应链制裁极限施压演进
+</div>
+</div>
+</div>
+<!-- 底部用户信息区 -->
+<div class="user-profile">
+<div class="avatar">A</div>
+<div class="user-name">admin</div>
+</div>
+</div>
+
+<div class="wrapper">
+<div class="header">
+<div class="header-tabs">
+<div class="header-tab active" id="tab-sys" onclick="switchTab('sys')">系统知识库</div>
+<div class="header-tab" id="tab-personal" onclick="switchTab('personal')">个人知识库</div>
+</div>
+<div class="actions">
+<div class="nl-input">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+<input type="text" placeholder="搜索...">
+</div>
+<!-- 默认系统知识库下无按钮，设为隐藏；点击个人知识库后变为上传按钮并展示 -->
+<button class="btn" id="action-btn" style="display: none;" onclick="openUploadModal()">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> 
+上传
+</button>
+</div>
+</div>
+
+<!-- ================= 系统知识库主体 ================= -->
+<div class="kb-body" id="body-sys">
+
+    <!-- 文件夹 1：南海历史与领土争议 -->
+    <div class="folder">
+        <div class="folder-title">
+            <div style="display: flex; align-items: center; gap: 8px;">南海历史与领土争议 <span class="folder-tag tag-general">通用</span></div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 50
+            </div>
+        </div>
+        <div class="doc-list">
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">1 南海问题的政策及国际法制度的演进.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">2 南海争端与国际法律机制的适用.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">3 南海问题的国际法理分析与我国对策研究.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">4 南海问题的起源、发展及演变.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">5 南海领土争端的历史、现状与对策研究.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">6 南海争端中的多边主义与双边谈判.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">7 南海问题的国际法与地区稳定.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">8 南海争端中的历史依据与领土主权争议.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">9 The International Law of the Sea and the South China Sea...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">10 Power Shift, the South China Sea Dispute, and the Role of...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">11 The Law of the Sea and the Resolution of the South China...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">12 South China Sea Dispute: Legal Studies and Diplomatic...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">13 The South China Sea: Geopolitics and Tensions Explained...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">14 Legal Mechanisms for Conflict Resolution in the South...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">15 The South China Sea: Law, Diplomacy and Security.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">16 South China Sea Disputes and the Limits of International...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+        </div>
+    </div>
+
+    <!-- 文件夹 2：国际法与南海争议解决机制 -->
+    <div class="folder">
+        <div class="folder-title">
+            <div style="display: flex; align-items: center; gap: 8px;">国际法与南海争议解决机制 <span class="folder-tag tag-law">法律</span></div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 20
+            </div>
+        </div>
+        <div class="doc-list">
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">1 南海问题的国际法解决路径.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">2 南海争端与国际法律机制的适用.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">3 国际法与南海争端的和平解决.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">4 南海问题的国际法与地区稳定.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">5 南海问题的政策及国际法制度的演进.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">6 中国与东盟国家南海危机管控探析.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">7 南海问题的国际法理分析与我国对策研究.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">8 论解决南海争端的国际法路径.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">9 国际法解决南海争议:法律框架与实践路径.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">10 ASEAN's Role in the Formulation of the South China Sea Code ...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">11 Legal Studies AT3: South China Sea Dispute Case Study Analysis...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">12 The South China Sea: Geopolitics and Tensions Explained.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">13 South China Sea Dispute.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">14 The South China Sea: Law, Diplomacy and Security.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">15 The South China Sea Dispute: A Legal and Diplomatic ...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">16 Legal Mechanisms for Conflict Resolution in the South China...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+        </div>
+    </div>
+
+    <!-- 文件夹 3：菲律宾政治体系 -->
+    <div class="folder">
+        <div class="folder-title">
+            <div style="display: flex; align-items: center; gap: 8px;">菲律宾政治体系 <span class="folder-tag tag-politics">政治</span></div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 60
+            </div>
+        </div>
+        <div class="doc-list">
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">1 菲律宾政治体系概述.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">2 菲律宾政党政治生态: 家族式庇护主义对碎片化政党体系的塑造.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">3 菲律宾政治文化探析.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">4 菲律宾政治制度的演变与挑战.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">5 菲律宾家族政治的历史与现实.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">6 菲律宾总统制的实践与问题.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">7 菲律宾立法机关的结构与功能.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">8 菲律宾司法体系的独立性与挑战.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">9 菲律宾地方政府的自治与中央集权.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">10 菲律宾选举制度与政治参与.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">11 Philippine Politics and Governance: An Introduction.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">12 Philippine Politics and Society in the Twentieth Century: Colonial...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">13 Philippine Politics: Possibilities and Problems in a Localist...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">14 Examining Philippine Political Development: Over Three Decades...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">15 The Political Economy of the Philippines: Critical Perspectives.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">16 An Anarchy of Parties: The Pitfalls of the Presidential-Based Party...</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+        </div>
+    </div>
+
+    <!-- 文件夹 4：菲律宾社会结构 -->
+    <div class="folder">
+        <div class="folder-title">
+            <div style="display: flex; align-items: center; gap: 8px;">菲律宾社会结构 <span class="folder-tag tag-general">通用</span></div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 10
+            </div>
+        </div>
+        <div class="doc-list">
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">1 菲律宾的社会结构与家族政治.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">2 菲律宾社会结构的变迁与现代化.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">3 菲律宾的社会阶层与不平等现象.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">4 菲律宾的封建社会结构与政治体制.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">5 菲律宾社会与革命.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">6 菲律宾的政治与社会结构: 家族与庇护关系的作用.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">7 菲律宾社会中庇护关系的演变.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">8 菲律宾的政治与社会结构: 家族与庇护关系的作用.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">9 菲律宾社会中庇护关系的演变.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+        </div>
+    </div>
+
+    <!-- 文件夹 5：菲律宾经济与发展 -->
+    <div class="folder">
+        <div class="folder-title">
+            <div style="display: flex; align-items: center; gap: 8px;">菲律宾经济与发展 <span class="folder-tag tag-economy">经济</span> <span class="folder-tag tag-politics">政治</span></div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 333
+            </div>
+        </div>
+        <div class="doc-list">
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">1 菲律宾经济结构转型与增长模式研究.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">2 菲律宾发展中国家路径: 挑战与机遇.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">3 菲律宾制造业发展现状与战略选择.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">4 菲律宾对外投资与引资政策分析.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">5 菲律宾城镇化进程与区域经济发展.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">6 菲律宾贫困、收入分配与可持续发展.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">7 菲律宾服务业主导下的经济增长机制.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">8 菲律宾贫困、收入分配与可持续发展.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">9 菲律宾服务业主导下的经济增长机制.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2022.03.04</span> <svg class="icon icon-sm star-btn" viewBox="0 0 24 24" onclick="addToPersonal(this, event)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= 个人知识库主体 (初始隐藏) ================= -->
+<div class="kb-body" id="body-personal" style="display: none;">
+    <!-- 文件夹：我的报告 -->
+    <div id="reports-wrapper" style="grid-column: 1 / -1; margin-bottom: 24px; transition: margin-bottom 0.2s;">
+        <!-- 将3个操作按钮紧跟在我的报告文字之后 -->
+        <div class="folder-title" style="justify-content: flex-start; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px;">我的报告</div>
+            <!-- 视图切换区域 -->
+            <div style="display: flex; align-items: center; gap: 8px; color: #94A3B8;">
+                <!-- 平铺展示 -->
+                <svg id="view-grid-btn" class="icon" style="cursor: pointer; color: var(--primary-blue);" onclick="switchReportView('grid')" viewBox="0 0 24 24" title="平铺展示">
+                    <rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <!-- 列表展示 -->
+                <svg id="view-list-btn" class="icon" style="cursor: pointer; transition: 0.2s;" onclick="switchReportView('list')" viewBox="0 0 24 24" title="列表展示">
+                    <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
+                </svg>
+            </div>
+            <!-- 数量 -->
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 3
+            </div>
+        </div>
+        <div id="report-list-container" class="doc-list" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 10px; max-height: none; overflow: visible; transition: 0.2s;">
+            <!-- 报告卡片1 -->
+            <div class="report-item">
+                <div class="report-header">
+                    <div class="report-header-left">
+                        <svg viewBox="0 0 24 24" class="report-header-icon" style="fill: #4285F4;">
+                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+                        </svg>
+                        <div class="report-title">2024第一季度南海局势分析研判.docx</div>
+                    </div>
+                    <!-- 仅在列表模式下展示的评分和日期 -->
+                    <span class="report-list-score" style="display: none;">★★★★★</span>
+                    <span class="report-list-date" style="display: none;">2024.04.01</span>
+
+                    <svg class="report-options-icon" viewBox="0 0 24 24" width="20" height="20" style="fill: #64748B; cursor: pointer; flex-shrink: 0;">
+                        <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                    </svg>
+                </div>
+                <div class="report-meta-info">
+                    <div>日期：2024年04月01日</div>
+                    <div>评分：<span class="star-rating">★★★★★</span></div>
+                </div>
+                <div>
+                    <div class="report-summary-title">摘要</div>
+                    <div class="report-summary-text">自2024年初以来，南海局势进入新的复杂阶段。本报告从地缘政治、海上摩擦及外交谈判三个维度，对当前局势进行全面剖析。重点关注了关键岛礁的补给问题以及周边国家的多边互动情况，为后续战略推演提供了扎实的数据支撑与理论依据...</div>
+                </div>
+                <div class="report-faded-section">局势演变背景与轨迹</div>
+            </div>
+            <!-- 报告卡片2 -->
+            <div class="report-item">
+                <div class="report-header">
+                    <div class="report-header-left">
+                        <svg viewBox="0 0 24 24" class="report-header-icon" style="fill: #4285F4;">
+                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+                        </svg>
+                        <div class="report-title">关于菲律宾政策变更的内部参考.pdf</div>
+                    </div>
+                    <!-- 仅在列表模式下展示的评分和日期 -->
+                    <span class="report-list-score" style="display: none;">★★★★☆</span>
+                    <span class="report-list-date" style="display: none;">2024.03.28</span>
+
+                    <svg class="report-options-icon" viewBox="0 0 24 24" width="20" height="20" style="fill: #64748B; cursor: pointer; flex-shrink: 0;">
+                        <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                    </svg>
+                </div>
+                <div class="report-meta-info">
+                    <div>日期：2024年03月28日</div>
+                    <div>评分：<span class="star-rating">★★★★☆</span></div>
+                </div>
+                <div>
+                    <div class="report-summary-title">摘要</div>
+                    <div class="report-summary-text">本文详细梳理了菲律宾近期在外交与安全政策上的调整轨迹。分析指出，其政策重心正发生显著偏移，内部派系博弈与外部大国影响是两大核心驱动力。报告进一步预测了该政策变更可能带来的区域安全环境以及经济合作等连锁反应...</div>
+                </div>
+                <div class="report-faded-section">政策变更的内部动因</div>
+            </div>
+            <!-- 报告卡片3 -->
+            <div class="report-item">
+                <div class="report-header">
+                    <div class="report-header-left">
+                        <svg viewBox="0 0 24 24" class="report-header-icon" style="fill: #4285F4;">
+                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path>
+                        </svg>
+                        <div class="report-title">中东原油市场短期走势预测分析.pdf</div>
+                    </div>
+                    <!-- 仅在列表模式下展示的评分和日期 -->
+                    <span class="report-list-score" style="display: none;">★★★★★</span>
+                    <span class="report-list-date" style="display: none;">2024.03.20</span>
+
+                    <svg class="report-options-icon" viewBox="0 0 24 24" width="20" height="20" style="fill: #64748B; cursor: pointer; flex-shrink: 0;">
+                        <path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path>
+                    </svg>
+                </div>
+                <div class="report-meta-info">
+                    <div>日期：2024年03月20日</div>
+                    <div>评分：<span class="star-rating">★★★★★</span></div>
+                </div>
+                <div>
+                    <div class="report-summary-title">摘要</div>
+                    <div class="report-summary-text">受近期中东地缘冲突加剧影响，全球原油市场波动率显著上升。本报告结合供需基本面与风险溢价模型，深入剖析了冲突对关键原油运输通道的潜在威胁。预计短期内油价将维持高位震荡，并伴随局部区域供应链脆弱等衍生问题...</div>
+                </div>
+                <div class="report-faded-section">市场波动的核心逻辑</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 文件夹：我的上传 -->
+    <div class="folder">
+        <div class="folder-title">
+            <div style="display: flex; align-items: center; gap: 8px;">我的上传</div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> 6
+            </div>
+        </div>
+        <div class="doc-list">
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">个人调研数据总结与预测分析.xlsx</span> <span style="color: #94A3B8; font-size: 12px;">2023.10.15</span></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">近期双边关系相关新闻汇总草稿.docx</span> <span style="color: #94A3B8; font-size: 12px;">2023.10.16</span></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">经济走势内部会议纪要备忘录.txt</span> <span style="color: #94A3B8; font-size: 12px;">2023.10.18</span></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">东南亚贸易关税影响评估表.xlsx</span> <span style="color: #94A3B8; font-size: 12px;">2023.10.19</span></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">南海航运数据及风险研判.pdf</span> <span style="color: #94A3B8; font-size: 12px;">2023.10.20</span></div>
+            <div class="doc-item"><span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">最新半导体出口管制条例解析.docx</span> <span style="color: #94A3B8; font-size: 12px;">2023.10.21</span></div>
+        </div>
+    </div>
+
+    <!-- 文件夹：我的收藏 -->
+    <div class="folder">
+        <div class="folder-title">
+            <div style="display: flex; align-items: center; gap: 8px;">我的收藏 <span class="folder-tag tag-law">系统同步</span></div>
+            <div style="color: #94A3B8; font-size: 12px; font-weight: normal; display: flex; align-items: center; gap: 4px;">
+                <svg class="icon icon-sm" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> 6
+            </div>
+        </div>
+        <div class="doc-list" id="personal-favorites-list">
+            <div class="doc-item" style="gap: 12px;">
+                <span class="folder-tag tag-law" style="flex-shrink: 0;">法律</span>
+                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">南海问题的国际法解决路径.pdf</span>
+                <span style="color: #94A3B8; font-size: 12px; flex-shrink: 0;">2022.03.04</span>
+            </div>
+            <div class="doc-item" style="gap: 12px;">
+                <span class="folder-tag tag-politics" style="flex-shrink: 0;">政治</span>
+                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">菲律宾政治体系概述.pdf</span>
+                <span style="color: #94A3B8; font-size: 12px; flex-shrink: 0;">2022.03.04</span>
+            </div>
+            <div class="doc-item" style="gap: 12px;">
+                <span class="folder-tag tag-economy" style="flex-shrink: 0;">经济</span>
+                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">菲律宾经济结构转型与增长模式研究.pdf</span>
+                <span style="color: #94A3B8; font-size: 12px; flex-shrink: 0;">2022.03.04</span>
+            </div>
+            <div class="doc-item" style="gap: 12px;">
+                <span class="folder-tag tag-general" style="flex-shrink: 0;">通用</span>
+                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">菲律宾的社会结构与家族政治.pdf</span>
+                <span style="color: #94A3B8; font-size: 12px; flex-shrink: 0;">2022.03.04</span>
+            </div>
+            <div class="doc-item" style="gap: 12px;">
+                <span class="folder-tag tag-law" style="flex-shrink: 0;">法律</span>
+                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">国际法解决南海争议:法律框架与实践路径.pdf</span>
+                <span style="color: #94A3B8; font-size: 12px; flex-shrink: 0;">2022.03.04</span>
+            </div>
+            <div class="doc-item" style="gap: 12px;">
+                <span class="folder-tag tag-general" style="flex-shrink: 0;">通用</span>
+                <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">南海问题的政策及国际法制度的演进.pdf</span>
+                <span style="color: #94A3B8; font-size: 12px; flex-shrink: 0;">2022.03.04</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+
+<!-- ================= 上传弹窗 ================= -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal">
+        <div class="modal-header">
+            <span>上传文件</span>
+            <svg class="icon icon-sm modal-close" onclick="closeUploadModal()" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </div>
+        <div class="modal-body">
+            <div class="upload-area">
+                <svg class="icon icon-lg" style="margin-bottom: 8px;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <div style="font-size: 14px; font-weight: 500; color: #1E293B;">点击或将文件拖拽到这里上传</div>
+                <div style="font-size: 12px; margin-top: 6px; opacity: 0.7;">支持 PDF, DOCX, TXT, XLSX, PPT, Markdown (最大 50MB)</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeUploadModal()">取消</button>
+            <button class="btn" onclick="closeUploadModal()">确认上传</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// 侧边栏展开收起逻辑
+function toggleToolbar() {
+const tb = document.getElementById('toolbar');
+const toggleBtn = document.getElementById('sidebar-toggle-btn');
+tb.classList.toggle('expanded');
+if (tb.classList.contains('expanded')) {
+toggleBtn.title = "收起边栏";
+} else {
+toggleBtn.title = "展开边栏";
+}
+}
+
+// 历史列表展开收起逻辑
+function toggleHistoryList() {
+const list = document.getElementById('history-list-container');
+const arrow = document.getElementById('history-arrow');
+if (list.style.display === 'none') {
+list.style.display = 'flex';
+arrow.classList.remove('collapsed');
+} else {
+list.style.display = 'none';
+arrow.classList.add('collapsed');
+}
+}
+
+// Tab 切换控制与动作按钮更新逻辑
+function switchTab(tab) {
+    const tabSys = document.getElementById('tab-sys');
+    const tabPersonal = document.getElementById('tab-personal');
+    const bodySys = document.getElementById('body-sys');
+    const bodyPersonal = document.getElementById('body-personal');
+    const actionBtn = document.getElementById('action-btn');
+
+    if (tab === 'sys') {
+        tabSys.classList.add('active');
+        tabPersonal.classList.remove('active');
+        bodySys.style.display = ''; 
+        bodyPersonal.style.display = 'none';
+        actionBtn.style.display = 'none'; 
+    } else {
+        tabPersonal.classList.add('active');
+        tabSys.classList.remove('active');
+        bodyPersonal.style.display = ''; 
+        bodySys.style.display = 'none';
+        actionBtn.style.display = 'inline-flex'; 
+    }
+}
+
+// 点击收藏：UI变化并同步至个人知识库收藏夹
+function addToPersonal(btn, event) {
+    event.stopPropagation();
+    
+    // 如果已经被收藏，则不重复添加
+    if (btn.classList.contains('active')) return;
+    
+    // 更新点亮星星的UI
+    btn.classList.add('active');
+
+    // 抓取该行的标题和时间节点
+    const parent = btn.parentElement;
+    const titleSpan = parent.querySelector('span:first-child').cloneNode(true);
+    const dateSpan = parent.querySelector('span:nth-child(2)').cloneNode(true);
+
+    // 获取个人收藏夹容器并追加
+    const list = document.getElementById('personal-favorites-list');
+    const newItem = document.createElement('div');
+    newItem.className = 'doc-item';
+    newItem.appendChild(titleSpan);
+    newItem.appendChild(dateSpan);
+    list.appendChild(newItem);
+}
+
+// 我的报告区域 - 切换网格(平铺)与列表展示视图
+function switchReportView(mode) {
+    const container = document.getElementById('report-list-container');
+    const gridBtn = document.getElementById('view-grid-btn');
+    const listBtn = document.getElementById('view-list-btn');
+    const wrapper = document.getElementById('reports-wrapper');
+    
+    if (mode === 'grid') {
+        container.classList.remove('list-view');
+        container.style.gridTemplateColumns = 'repeat(3, minmax(0, 1fr))';
+        gridBtn.style.color = 'var(--primary-blue)';
+        listBtn.style.color = '#94A3B8';
+        if (wrapper) wrapper.style.marginBottom = '24px';
+    } else {
+        container.classList.add('list-view');
+        container.style.gridTemplateColumns = ''; // 交给 CSS class 管理
+        listBtn.style.color = 'var(--primary-blue)';
+        gridBtn.style.color = '#94A3B8';
+        if (wrapper) wrapper.style.marginBottom = '16px';
+    }
+}
+
+// 上传弹窗开关逻辑
+function openUploadModal() {
+    document.getElementById('uploadModal').style.display = 'flex';
+}
+function closeUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+}
+</script>
+</body>
+</html>

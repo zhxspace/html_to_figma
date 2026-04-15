@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>推演报告 - DecisionOne</title>
+<style>
+/* 全局字体与清爽底色 */
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+body { background: #F8FAFC; height: 100vh; display: flex; color: #1E293B; overflow: hidden; -webkit-font-smoothing: antialiased; }
+/* 统一定义纯正蓝主题色 */
+:root { --primary-blue: #1A73E8; --primary-blue-light: #E8F0FE; --primary-black: #1E293B; }
+
+/* SVG 图标通用样式 */
+.icon { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 14px; height: 14px; }
+.icon-lg { width: 20px; height: 20px; }
+/* ================= 侧边栏重构 (Manus 风格) ================= */
+.global-toolbar { width: 68px; background: #FFFFFF; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow-x: hidden; overflow-y: hidden; white-space: nowrap; z-index: 100; flex-shrink: 0;}
+
+.global-toolbar.expanded { width: 260px; }
+.global-toolbar:hover { overflow-y: auto; }
+.global-toolbar::-webkit-scrollbar { width: 4px; }
+.global-toolbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+.tb-header { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 16px; margin-bottom: 8px; position: relative; }
+.global-toolbar:not(.expanded) .tb-header { justify-content: center; }
+.tb-logo-box { display: flex; align-items: center; gap: 10px; color: var(--primary-black); font-weight: 700; font-size: 16px; text-decoration: none; transition: opacity 0.2s; }
+
+.global-toolbar:not(.expanded) .tb-logo-box span { display: none; }
+.global-toolbar:not(.expanded) .tb-logo-box { justify-content: center; width: 100%; }
+.global-toolbar:not(.expanded) .sidebar-toggle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
+.global-toolbar:not(.expanded) .tb-header:hover .tb-logo-box { opacity: 0; }
+.global-toolbar:not(.expanded) .tb-header:hover .sidebar-toggle { opacity: 1; pointer-events: auto; background: #F1F5F9; }
+
+.sidebar-toggle { background: transparent; border: none; cursor: pointer; color: #64748B; padding: 6px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: 0.2s; outline: none; }
+.sidebar-toggle:hover { background: #F1F5F9; color: var(--primary-black); }
+.tb-nav { padding: 0 12px; margin-bottom: 24px; }
+.tb-item { display: flex; align-items: center; color: #1E293B; text-decoration: none; padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; transition: 0.2s; font-weight: 500; cursor: pointer; font-size: 14px; }
+
+.global-toolbar:not(.expanded) .tb-item { justify-content: center; padding: 12px 0; }
+.tb-item:hover { background: #F1F5F9; }
+.tb-item.active { background: var(--primary-blue-light); color: var(--primary-blue); }
+.tb-item svg { flex-shrink: 0; }
+.global-toolbar.expanded .tb-item svg { margin-right: 12px; }
+.global-toolbar:not(.expanded) .tb-item span { display: none; }
+.collapsed-history-btn { display: none !important; }
+.global-toolbar:not(.expanded) .collapsed-history-btn { display: flex !important; }
+
+.history-section { display: flex; flex-direction: column; padding: 0 12px; opacity: 1; transition: opacity 0.2s; }
+.global-toolbar:not(.expanded) .history-section { display: none; }
+.history-header { font-size: 14px; color: #64748B; font-weight: 600; padding: 0 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+.history-arrow-icon { transition: transform 0.3s; }
+.history-arrow-icon.collapsed { transform: rotate(-90deg); }
+.history-search { display: flex; align-items: center; background: #F8FAFC; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin: 0 0 12px 0; gap: 8px; color: #64748B; transition: 0.2s; }
+
+.history-search:focus-within { border-color: #CBD5E1; background: #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+.history-search input { border: none; background: transparent; outline: none; width: 100%; font-size: 13px; color: #1E293B; }
+.history-list { display: flex; flex-direction: column; gap: 2px; }
+.hist-item { font-size: 14px; color: #1E293B; padding: 10px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+
+.hist-item:hover { background: #F1F5F9; }
+
+/* 侧边栏底部用户信息 */
+.tb-footer-line { height: 1px; background: #E2E8F0; margin-top: auto; flex-shrink: 0; }
+.tb-footer { display: flex; align-items: center; padding: 16px 12px; gap: 10px; cursor: pointer; color: #1E293B; font-size: 14px; font-weight: 500; transition: 0.2s; flex-shrink: 0; }
+.global-toolbar:not(.expanded) .tb-footer { justify-content: center; padding: 16px 0; }
+.tb-footer:hover { background: #F1F5F9; }
+.tb-footer-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-black); color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: bold; font-size: 14px; }
+.global-toolbar:not(.expanded) .tb-footer-text { display: none; }
+
+/* 整体布局结构 */
+.wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+/* 顶部 Header */
+.header { height: 60px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 14px; flex-shrink: 0; z-index: 50;}
+/* 按钮规范 */
+.btn-outline { background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; outline: none; font-weight: 500; transition: 0.2s;}
+
+.btn-outline:hover { background: #F8FAFC; border-color: #94A3B8; }
+/* 报告主体区域 */
+.rep-body { flex: 1; display: flex; overflow: hidden; position: relative; }
+/* ================= 文档区 ================= */
+.doc-area { flex: 1; padding: 40px 0; overflow-y: auto; background: #FFFFFF; position: relative; }
+.doc-container { max-width: 800px; margin: 0 auto; padding: 0 40px; }
+
+.doc-h1 { font-size: 18px; font-weight: bold; margin-bottom: 24px; margin-top: 32px; color: #000000; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px; display: flex; align-items: center; gap: 8px;}
+.doc-h1:first-child { margin-top: 0; }
+
+.doc-p { position: relative; font-size: 14px; line-height: 1.8; color: #000000; margin-bottom: 16px; }
+.doc-p b { color: #000000; font-weight: bold; }
+/* 分支对比卡片 */
+.compare-box { display: flex; gap: 20px; margin-bottom: 24px; }
+.branch { flex: 1; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
+.branch-title { font-weight: bold; color: #000000; margin-bottom: 12px; font-size: 14px; display: flex; align-items: center; gap: 6px; border-bottom: 1px dashed #E2E8F0; padding-bottom: 8px;}
+
+/* 风险标签规范 */
+.report-risk-tag { display: inline-block; background: #FEF2F2; color: #EF4444; padding: 2px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #FCA5A5; margin-left: 6px; font-weight: 500;}
+
+/* ================= AI 对话区 ================= */
+.ai-area { width: 400px; min-width: 280px; position: relative; background: #FFFFFF; border-left: 1px solid #E2E8F0; display: flex; flex-direction: column; flex-shrink: 0; box-shadow: -2px 0 8px rgba(0,0,0,0.02); z-index: 10; }
+.ai-header { padding: 16px; font-weight: bold; border-bottom: 1px solid #E2E8F0; background: transparent; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #000000;}
+
+.chat-history { flex: 1; padding: 16px; overflow-y: auto; font-size: 14px; color: #000000;}
+.msg { margin-bottom: 16px; line-height: 1.6; }
+.msg.sys { background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 0 12px 12px 12px; }
+
+/* 用户发送气泡样式，同步 config.docx */
+.msg.user { 
+  background: #F1F5F9; 
+  color: #000000; 
+  padding: 12px 20px; 
+  border-radius: 16px 16px 0 16px; 
+  font-size: 14px; 
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02); 
+  border: 1px solid #E2E8F0; 
+  max-width: 80%; 
+  line-height: 1.5; 
+  word-break: break-all;
+  width: fit-content;
+  margin-left: auto;
+}
+
+/* AI 回复操作按钮 */
+.msg-actions { display: flex; gap: 16px; margin-top: 16px; color: #64748B; font-size: 13px; align-items: center; border-top: 1px dashed #E2E8F0; padding-top: 12px;}
+.msg-action-btn { display: flex; align-items: center; gap: 4px; cursor: pointer; transition: color 0.2s; }
+.msg-action-btn:hover { color: var(--primary-blue); }
+
+/* 右侧栏拖动控制条样式 */
+.ai-resizer {
+  position: absolute;
+  left: -2px;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  background-color: transparent;
+  z-index: 50;
+  transition: background-color 0.2s;
+}
+.ai-resizer:hover, .ai-resizer.resizing {
+  background-color: var(--primary-blue);
+}
+
+/* 底部输入框外层及气泡联动 */
+.chat-input-container { border-top: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; }
+.ai-selection-bar { display: none; align-items: center; justify-content: space-between; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin: 16px 16px 0 16px; font-size: 13px; color: #64748B; }
+.ai-selection-bar-text { border-left: 2px solid #CBD5E1; padding-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.chat-input { padding: 16px; display: flex; align-items: center; position: relative; background: #FFFFFF;}
+.chat-input input { flex: 1; padding: 10px 48px 10px 16px; border: 1px solid #E2E8F0; border-radius: 20px; outline: none; font-size: 14px; background: #FAFAFB; transition: 0.2s; color: #000000;}
+.chat-input input:focus { border-color: var(--primary-blue); background: #FFFFFF; }
+
+/* 统一发送按钮圆底样式 (参考 config.docx) */
+.send-btn-circle { position: absolute; width: 32px; height: 32px; border-radius: 50%; background: #CBD5E1; color: #FFFFFF; border: none; display: flex; align-items: center; justify-content: center; cursor: not-allowed; transition: background 0.2s; pointer-events: none; }
+.send-btn-circle.active { background: var(--primary-black); cursor: pointer; pointer-events: auto; }
+.send-btn-circle.active:hover { background: #334155; }
+
+/* 自定义滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ================= 报告段落新增及悬浮交互支持 ================= */
+.q-title { color: #000000; font-size: 14px; margin-bottom: 12px; font-weight: 500; }
+.q-list { padding-left: 20px; color: #000000; margin-bottom: 24px; line-height: 1.8; font-size: 14px; }
+.q-list li { position: relative; margin-bottom: 8px; }
+
+/* 伪选中高亮样式：跨域点击输入框不丢失选中 */
+.mock-highlight { background-color: #B3D4FF; color: inherit; border-radius: 2px; }
+/* 针对段落级的伪选中高亮 */
+.mock-block-highlight { background-color: #B3D4FF; border-radius: 2px; }
+
+/* 文本选中时悬浮工具栏 */
+.floating-toolbar {
+    position: absolute; display: none; background: #FFFFFF; border: 1px solid #E2E8F0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08); border-radius: 8px; padding: 8px 12px;
+    z-index: 1000; align-items: center; gap: 10px; font-size: 14px; color: #1E293B;
+    /* 新增优化：强制不换行，且保持最大宽度适应内容，使长度固定不变 */
+    width: max-content; 
+}
+.floating-toolbar .ft-divider { width: 1px; height: 20px; background: #E2E8F0; }
+.floating-toolbar .ft-btn { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+.floating-toolbar .ft-btn:hover { background: #F1F5F9; }
+.floating-toolbar .ft-btn svg { width: 18px; height: 18px; stroke-width: 2; }
+/* 优化 T B S I U 等图标的大小与对齐 */
+.ft-text-icon { font-family: 'Times New Roman', Times, serif; font-size: 16px; height: 24px; min-width: 24px; display: flex; align-items: center; justify-content: center; padding: 0 2px; }
+
+/* 段落悬浮操作柄 (T ⋮⋮) */
+.para-handle {
+    position: absolute; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px 6px;
+    font-size: 13px; color: #94A3B8; box-shadow: 0 2px 6px rgba(0,0,0,0.05); font-family: -apple-system, sans-serif;
+    letter-spacing: 1px; display: none; align-items: center; cursor: pointer; z-index: 100; transition: color 0.2s;
+}
+.para-handle:hover { color: #64748B; background: #F8FAFC; }
+.para-handle span { color: var(--primary-blue); font-weight: 500; margin-right: 2px; }
+
+/* 点击操作柄后的下拉菜单 */
+.para-dropdown {
+    position: absolute; display: none; background: #FFFFFF; border: 1px solid #E2E8F0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 8px; padding: 8px 0; z-index: 1100;
+    width: 220px; font-size: 13px; color: #1E293B;
+}
+.para-dropdown .pd-item { display: flex; align-items: center; padding: 8px 16px; cursor: pointer; transition: background 0.2s; gap: 10px; }
+.para-dropdown .pd-item:hover { background: #F1F5F9; }
+.para-dropdown .pd-item svg { width: 16px; height: 16px; color: #64748B; flex-shrink: 0; }
+.para-dropdown .pd-divider { height: 1px; background: #E2E8F0; margin: 4px 0; }
+.para-dropdown .pd-row { display: flex; align-items: center; padding: 4px 16px; justify-content: space-between; }
+.para-dropdown .pd-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; transition: 0.2s; color: #475569; font-weight: 500; }
+.para-dropdown .pd-icon-btn:hover { background: #E2E8F0; color: #1E293B; }
+.para-dropdown .pd-icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 态势演化复盘Timeline样式 - 上下更紧凑 */
+.timeline-wrapper { display: flex; flex-direction: column; gap: 24px; margin-bottom: 32px; }
+.tl-branch { position: relative; }
+.tl-branch-title { display: inline-block; background: #60A5FA; color: #FFF; padding: 4px 16px; font-size: 13px; font-weight: bold; border-radius: 4px; margin-bottom: 12px; }
+.tl-nodes { display: flex; gap: 16px; margin-bottom: 8px; }
+.tl-node { flex: 1; background: #EFF6FF; border-radius: 4px; padding: 12px 16px; font-size: 14px; color: #000000; line-height: 1.4; text-align: center; }
+.tl-axis { display: flex; position: relative; padding-top: 8px; }
+.tl-line { position: absolute; top: 12px; left: 16%; right: 16%; height: 2px; background: #93C5FD; z-index: 1; }
+.tl-step { flex: 1; text-align: center; position: relative; z-index: 2; font-size: 14px; color: #3B82F6; }
+.tl-step::before { content: ''; display: block; width: 10px; height: 10px; background: #FFF; border: 2px solid #3B82F6; border-radius: 50%; margin: 0 auto 4px auto; }
+.tl-step span { display: block; color: #000000; margin-top: 2px; font-size: 14px; }
+
+/* 洞察文本样式 */
+.insight-section-title { font-size: 14px; font-weight: bold; color: var(--primary-blue); margin-top: 16px; margin-bottom: 12px; }
+.insight-section-title:first-child { margin-top: 0; }
+.insight-item { position: relative; margin-bottom: 16px; font-size: 14px; line-height: 1.6; }
+.insight-item-title { color: #000000; font-weight: bold; display: block; margin-bottom: 4px; }
+.insight-item-desc { color: #000000; }
+.insight-summary { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 16px; font-size: 14px; color: #000000; line-height: 1.6; margin-top: 24px; margin-bottom: 32px; }
+
+/* 风险点清单Grid样式 */
+.risk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+.risk-card { border: 1px solid #E2E8F0; border-radius: 6px; overflow: hidden; background: #FFF; }
+.risk-card-header { background: #EFF6FF; color: #000000; font-weight: bold; font-size: 14px; text-align: center; padding: 10px; border-bottom: 1px solid #E2E8F0; }
+.risk-card-body { padding: 12px; font-size: 14px; color: #000000; line-height: 1.6; }
+
+/* 策略优化建议Table样式 */
+.strategy-table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+.strategy-table td { border: 1px solid #E2E8F0; padding: 12px 16px; font-size: 14px; line-height: 1.6; }
+.strategy-table tr td:first-child { background: #F8FAFC; font-weight: 500; color: #000000; width: 28%; text-align: center; }
+.strategy-table tr td:last-child { color: #000000; background: #FFF; }
+</style>
+</head>
+<body>
+<!-- 工具栏默认收起 -->
+<div class="global-toolbar" id="toolbar">
+<div class="tb-header">
+<a href="home.html" class="tb-logo-box" title="DecisionOne 首页">
+<svg class="icon icon-lg" style="color:var(--primary-black);" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 18C4.686 18 2 15.314 2 12c0-3.314 2.686-6 6-6 2.5 0 4.8 1.5 5.5 3.5" />
+<path d="M16 6c3.314 0 6 2.686 6 6 0 3.314-2.686 6-6 6-2.5 0-4.8-1.5-5.5-3.5" />
+</svg>
+<span>DecisionOne</span>
+</a>
+<button id="sidebar-toggle-btn" class="sidebar-toggle" onclick="toggleToolbar()" title="展开边栏">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+</button>
+</div>
+<div class="tb-nav">
+<a href="home.html" class="tb-item">
+<svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<span>新建任务</span>
+</a>
+<a href="knowledge.html" class="tb-item">
+<svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+<span>知识库</span>
+</a>
+<div class="tb-item collapsed-history-btn" onclick="toggleToolbar()" title="历史任务">
+<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+</div>
+</div>
+<div class="history-section">
+<div class="history-header">
+<div style="display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="toggleHistoryList()">
+<span>历史任务</span>
+<svg id="history-arrow" class="icon icon-sm history-arrow-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+<svg class="icon icon-sm" style="cursor: pointer;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+</div>
+<div class="history-list" id="history-list-container">
+<div class="hist-item" onclick="window.location.href='workspace.html'">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+菲律宾仁爱礁强行运补事件推演
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+关税后续问题推演评估及应对
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+中东原油市场短期走势预测分析
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+东海防空识别区常态化巡航评估
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+半导体供应链制裁极限施压演进
+</div>
+</div>
+</div>
+<!-- 新增：侧边栏底部用户信息 -->
+<div class="tb-footer-line"></div>
+<div class="tb-footer" title="用户账户">
+<div class="tb-footer-avatar">A</div>
+<span class="tb-footer-text">admin</span>
+</div>
+</div>
+<div class="wrapper">
+<div class="header">
+<div style="display: flex; align-items: center; gap: 8px;">
+<svg class="icon icon-lg" style="color:var(--primary-blue);" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+<span style="color: #000000;"><b>菲律宾仁爱礁强行运补事件多分支推演报告</b></span>
+</div>
+<div style="display: flex; align-items: center;">
+<button class="btn-outline" onclick="window.location.href='home.html'" style="margin-left:12px; padding: 0 16px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px;">
+返回首页
+</button>
+<button class="btn-outline" style="margin-left:8px; padding: 0 16px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px;">
+<svg class="icon icon-sm" style="margin-right: 6px;" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+分享
+</button>
+<button class="btn" style="margin-left:8px; padding: 0 16px; height: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; background:#1E293B; color:#fff; border: 1px solid #1E293B; border-radius:8px; cursor: pointer; transition: 0.2s;">
+<svg class="icon icon-sm" style="margin-right: 6px;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+下载报告
+</button>
+</div>
+</div>
+<div class="rep-body">
+<div class="doc-area" id="report-doc-area">
+<!-- 优化：设置 contenteditable 使得点击即出现光标 -->
+<div class="doc-container" contenteditable="true" style="outline: none;">
+
+<!-- 一、核心问题回答 (所有文字纯黑) -->
+<div class="doc-h1">
+一、核心问题回答
+</div>
+<div class="q-title">问题1：菲律宾强行运补对南海局势产生的影响</div>
+<div class="doc-p" style="color:#000000; margin-bottom:8px;">这一行为在任何情景下都会直接推高地区军事紧张水平，并引发菲律宾国内的民族主义与舆情反应。</div>
+<ul class="q-list">
+  <li>在现场，它意味着中菲海上执法力量进入更近距离接触，摩擦的烈度和频率都会显著上升，从而被国内舆论塑造成“主权捍卫”的象征。</li>
+  <li>在国际场域，菲律宾会借此时机发动外交抗议与多边动员，争取美国和部分盟友的公开支持，扩大事件影响。</li>
+</ul>
+
+<div class="q-title">问题2：如果美军驱逐舰进入南海会有什么影响</div>
+<ul class="q-list" style="margin-bottom:12px;">
+  <li>军事层面：美国海军的出现意味着冲突风险加码，中方的海上力量将被迫做出针对性部署，中美直接对峙概率上升，活动空间更拥挤。</li>
+  <li>外交层面：局势将被推到大国博弈的高度，东盟国家面临选边压力，区域对抗性加剧。</li>
+</ul>
+<div class="doc-p" style="color:#000000; margin-bottom: 32px;">这一介入显著降低了降温的可能性，即便后续出现外交接触契机，由于紧张状态已被“固化”，政策灵活度大幅下降。</div>
+
+<!-- 二、态势演化复盘 -->
+<div class="doc-h1">
+二、态势演化复盘
+</div>
+<div class="timeline-wrapper">
+  <!-- 分支A -->
+  <div class="tl-branch">
+    <div class="tl-branch-title">分支A (有美舰介入)</div>
+    <div class="tl-nodes">
+      <div class="tl-node">局势骤然升温，军事与<br>外交双高，舆论迅速硬化</div>
+      <div class="tl-node">紧张度冲到顶点，舆论进入“中美<br>对抗”框架，反华情绪稳定在极高值。</div>
+      <div class="tl-node">降温速度极慢，高压<br>状态延续。</div>
+    </div>
+    <div class="tl-axis">
+      <div class="tl-line"></div>
+      <div class="tl-step">round 1<span>运补事件</span></div>
+      <div class="tl-step">round 2<span>美舰入场</span></div>
+      <div class="tl-step">round 3<span>无新事件</span></div>
+    </div>
+  </div>
+  
+  <!-- 分支B -->
+  <div class="tl-branch">
+    <div class="tl-branch-title">分支B (无外部事件，自然演化)</div>
+    <div class="tl-nodes">
+      <div class="tl-node">局势上升，<br>但仍位于可控区</div>
+      <div class="tl-node">无强力外部介入，紧张度和外交<br>压力自然回落，舆论热度下降，<br>反华情绪温和降低。</div>
+      <div class="tl-node">继续缓和，出现外交<br>接触意向。</div>
+    </div>
+    <div class="tl-axis">
+      <div class="tl-line"></div>
+      <div class="tl-step">round 1<span>运补事件</span></div>
+      <div class="tl-step">round 2<span>延续</span></div>
+      <div class="tl-step">round 3<span></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 洞察文本 -->
+<div class="insight-section-title">对比发现</div>
+<div class="insight-item">
+  <span class="insight-item-title">外部介入是紧张状态固化的决定性因素</span>
+  <span class="insight-item-desc">有美舰介入的情景里，局势和舆论几乎锁死在高位，降温极难；无美舰介入时，局势有较强自我修复能力。</span>
+</div>
+<div class="insight-item">
+  <span class="insight-item-title">触发事件的叙事走向在第一轮基本定型</span>
+  <span class="insight-item-desc">第一轮对事件的定性将左右后续舆论方向和公众情绪走势。</span>
+</div>
+<div class="insight-item">
+  <span class="insight-item-title">外交回旋空间与外部介入成反比</span>
+  <span class="insight-item-desc">外部大国的军事参与迫使东盟等区域国家选边站，削弱调解作用。</span>
+</div>
+
+<div class="insight-section-title">战略洞察</div>
+<div class="insight-item">
+  <span class="insight-item-title">分支预案化</span>
+  <span class="insight-item-desc">在面对类似事件时，应当事先区分“外力介入”与“无外力介入”两种路线，匹配不同的应对模板。</span>
+</div>
+<div class="insight-item">
+  <span class="insight-item-title">抓住自然降温窗口</span>
+  <span class="insight-item-desc">如果无外部介入，应迅速释放外交善意和降温动作，加快恢复多边对话。</span>
+</div>
+<div class="insight-item">
+  <span class="insight-item-title">稳控高压期的风险</span>
+  <span class="insight-item-desc">若外力介入已成事实，应将重心切换到风险管理与防扩散，避免战术意外演变成战略危机。</span>
+</div>
+<div class="insight-item">
+  <span class="insight-item-title">舆论战的时间敏感性</span>
+  <span class="insight-item-desc">舆情叙事在初期的塑造几乎决定长期话语格局，需在事件发生后的黄金24小时内投入资源应对。</span>
+</div>
+<div class="insight-summary">
+  这两条推演路径清楚表明——“外部军力介入”与否，是南海摩擦局势能否自然降温的临界变量。中国需要在战略层面设计双轨方案：一条应对无外力介入的自然演化场景（以外交与东盟合作为主），另一条应对外力介入导致的高压固化场景（以危机管理与舆论对冲为主），这样才能在局势突变时保持主动权。
+</div>
+
+<!-- 三、事件链深度剖析 -->
+<div class="doc-h1">
+三、事件链深度剖析
+</div>
+<ul class="q-list">
+  <li><b>触发点：</b>菲运补事件是导火索，引发现场对抗 -> 舆论放大 -> 政策硬化。</li>
+  <li><b>加速器：</b>美国军舰介入会成为态势固化的催化剂，中美直接对立的框架形成后，地区其他方被动卷入。</li>
+  <li><b>缓冲机制：</b>在没有外部硬实力介入的情景下，局势会通过外交接触、媒体注意力转移等方式逐渐自我降温。</li>
+  <li><b>长期效应：</b>舆论叙事一旦形成定式（如“中国霸凌”），在没有有力反叙事和外交突破的情况下，会持续影响政策，即便实地摩擦减少，政策依旧偏硬。</li>
+</ul>
+
+<!-- 四、关键风险点清单 -->
+<div class="doc-h1">
+四、关键风险点清单
+</div>
+<div class="risk-grid">
+  <div class="risk-card">
+    <div class="risk-card-header">擦枪走火风险</div>
+    <div class="risk-card-body">多方舰机近距离机动，在无沟通或沟通延迟情况下可能发生意外冲突。</div>
+  </div>
+  <div class="risk-card">
+    <div class="risk-card-header">对抗固化风险</div>
+    <div class="risk-card-body">外部大国军事存在把短期摩擦变成长期高压状态，降低外交腾挪空间。</div>
+  </div>
+  <div class="risk-card">
+    <div class="risk-card-header">多边平台功能削弱</div>
+    <div class="risk-card-body">东盟被迫选边，失去中立调解功能。</div>
+  </div>
+  <div class="risk-card">
+    <div class="risk-card-header">舆论绑架风险</div>
+    <div class="risk-card-body">国内民族主义情绪长期高位，限制政策调整余地。</div>
+  </div>
+</div>
+
+<!-- 五、策略优化建议 -->
+<div class="doc-h1">
+五、策略优化建议
+</div>
+<table class="strategy-table">
+  <tbody>
+    <tr>
+      <td>东盟分化与稳固双边渠道</td>
+      <td>主动接触中立和友好国家，减少菲律宾的外交动员成功率。</td>
+    </tr>
+    <tr>
+      <td>建立风险防控机制</td>
+      <td>确保对美、对菲有直接军事联络渠道，在高压期防止战术层面的意外冲突。</td>
+    </tr>
+    <tr>
+      <td>舆论主动态势塑造</td>
+      <td>布局国际叙事，削弱“霸凌者”标签，通过透明信息和法律依据塑造克制形象。</td>
+    </tr>
+    <tr>
+      <td>现场执法标准化</td>
+      <td>制定可预期的现场应对规则，既保证主权，又避免因一线即兴动作而引发升级。</td>
+    </tr>
+    <tr>
+      <td>渐进性姿态管理</td>
+      <td>根据局势阶段，适度释放降温动作（如放行非敏感民用补给），营造谈判窗口。</td>
+    </tr>
+  </tbody>
+</table>
+
+</div>
+
+<!-- 鼠标悬停时展示的段落操作柄 -->
+<div id="para-handle" class="para-handle">
+    <span style="color:var(--primary-blue)">T</span> ⋮⋮
+</div>
+
+<!-- 点击操作柄弹出的下拉菜单 (仿 AI改写工具栏2.jpg) -->
+<div id="para-dropdown" class="para-dropdown">
+    <div class="pd-item ai-rewrite-btn" style="color: var(--primary-blue); font-weight: 500;">
+        <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; color: var(--primary-blue); margin-right: 6px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> AI 改写
+    </div>
+    <div class="pd-divider"></div>
+    <!-- 第二行：T | H1 | H2 | H3 | H4 | 列表 -->
+    <div class="pd-row">
+        <div class="pd-icon-btn" style="color: var(--primary-blue); background: #E8F0FE;">T</div>
+        <div class="pd-icon-btn">H1</div>
+        <div class="pd-icon-btn">H2</div>
+        <div class="pd-icon-btn">H3</div>
+        <div class="pd-icon-btn">H4</div>
+        <div class="pd-icon-btn"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></div>
+    </div>
+    <!-- 第三行：优化 123有序列表、双引号、高亮图标 -->
+    <div class="pd-row">
+        <!-- 明确的 1 2 3 序号列表图标 -->
+        <div class="pd-icon-btn" title="有序列表">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="6" x2="21" y2="6"></line>
+                <line x1="12" y1="12" x2="21" y2="12"></line>
+                <line x1="12" y1="18" x2="21" y2="18"></line>
+                <text x="3" y="9" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">1</text>
+                <text x="3" y="15" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">2</text>
+                <text x="3" y="21" font-size="7" fill="currentColor" stroke="none" font-family="sans-serif">3</text>
+            </svg>
+        </div>
+        <div class="pd-icon-btn"><svg viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></div>
+        <div class="pd-icon-btn"><svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></div>
+        <!-- 明确的双引号引用图标 -->
+        <div class="pd-icon-btn" title="引用">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"></path>
+                <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"></path>
+            </svg>
+        </div>
+        <!-- 明确的“A”高亮图标 -->
+        <div class="pd-icon-btn" title="高亮">
+            <span style="background: #FEF08A; padding: 0 4px; border-radius: 2px; font-weight: bold; font-family: serif; font-size: 13px; line-height: 16px; display: inline-block; color: #1E293B;">A</span>
+        </div>
+        <div class="pd-icon-btn" style="visibility:hidden;"></div>
+    </div>
+    <div class="pd-divider"></div>
+    <div class="pd-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg> <span style="flex:1;">缩进和对齐</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+    <div class="pd-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg> <span style="flex:1;">颜色</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+    <div class="pd-divider"></div>
+    <div class="pd-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg> 评论</div>
+    <div class="pd-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="20" y1="4" x2="8.12" y2="15.88"></line><line x1="14.47" y1="14.48" x2="20" y2="20"></line><line x1="8.12" y1="8.12" x2="12" y2="12"></line></svg> 剪切</div>
+    <div class="pd-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> 复制</div>
+    <div class="pd-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg> 删除</div>
+    <div class="pd-divider"></div>
+    <div class="pd-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg> <span style="flex:1;">在下方添加</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
+</div>
+
+<!-- 文档内悬浮：选中后的横向编辑工具栏 -->
+<div id="floating-toolbar" class="floating-toolbar">
+    <div class="ft-btn ai-rewrite-btn" style="color: var(--primary-blue); font-weight: 500;">
+        <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; color: var(--primary-blue); margin-right: 4px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> AI 改写
+    </div>
+    <div class="ft-divider"></div>
+    <div class="ft-btn ft-text-icon">T <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:14px;height:14px;margin-left:2px;"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+    <div class="ft-divider"></div>
+    <div class="ft-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="15" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:14px;height:14px;margin-left:2px;"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+    <div class="ft-divider"></div>
+    
+    <div class="ft-btn ft-text-icon" style="font-weight: bold;">B</div>
+    <div class="ft-btn ft-text-icon" style="text-decoration: line-through;">S</div>
+    <div class="ft-btn ft-text-icon" style="font-style: italic;">I</div>
+    <div class="ft-btn ft-text-icon" style="text-decoration: underline;">U</div>
+    <!-- 优化：将超链接🔗图标调小 -->
+    <div class="ft-btn ft-text-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+        </svg>
+    </div>
+    
+    <div class="ft-btn ft-text-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg></div>
+    <div class="ft-btn"><span style="background: #FEF08A; padding: 0 4px; border-radius: 2px;">A</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:14px;height:14px;margin-left:2px;"><polyline points="6 9 12 15 18 9"></polyline></svg></div>
+    <div class="ft-divider"></div>
+    <div class="ft-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> <span style="margin-left:2px;">复制</span></div>
+    <div class="ft-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></div>
+</div>
+
+<!-- AI改写弹窗悬浮框 -->
+<div id="ai-rewrite-popup" style="display:none; position:absolute; z-index:1200; background:#FFFFFF; border:1px solid #E2E8F0; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08); width: 400px; padding:12px;">
+    <div style="position:relative; display:flex; align-items:center;">
+        <input type="text" id="ai-rewrite-input" placeholder="说说你想怎么改写" style="flex:1; border:none; outline:none; font-size:14px; padding:8px 48px 8px 12px; background:#F8FAFC; border-radius:8px; color:#1E293B;" oninput="checkRewriteInput()">
+        <button class="send-btn-circle" id="rewrite-send-btn" title="发送指令" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px;">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+        </button>
+    </div>
+</div>
+
+</div>
+
+<!-- 右侧 AI 搜索与辅助问答 (带拖拽缩放控制条) -->
+<div class="ai-area" id="ai-area">
+<div class="ai-resizer" id="ai-resizer"></div>
+<div class="ai-header">
+<svg class="icon" style="color:var(--primary-blue);" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+AI报告助手
+</div>
+<div class="chat-history">
+<div class="msg sys">
+  <span style="color:#000000; font-weight:bold; display:block; margin-bottom:8px;">您好，我是AI写作助手</span>
+  可以随时为您解答写作中遇到的问题，有什么可以帮助您的吗？
+</div>
+<!-- 同步了 config.docx 的用户气泡样式 -->
+<div class="msg user">菲律宾进行强行运补的动机是什么？</div>
+
+<!-- AI回复区域，内联样式调整实现排版紧凑化 -->
+<div class="msg sys" style="line-height: 1.4;">
+  <div style="color:var(--primary-blue); font-weight:bold; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    AI 已完成分析
+  </div>
+  <div style="margin-bottom:6px;">菲律宾进行强行运补的动机可以从多个角度分析：</div>
+  <ol style="padding-left: 16px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 4px;">
+    <li><b>国内政治压力：</b>菲律宾马科斯政府面临国内政治和经济困境，支持率下滑，贫困率上升。通过南海挑衅转移国内矛盾焦点，成为其维持政治支持的手段之一。</li>
+    <li><b>外部支持幻想：</b>菲律宾依赖美国的“安全承诺”，试图通过引入外部力量（如美国）来增强其在南海问题上的立场，尽管这种支持的实际效果存疑。</li>
+    <li><b>资源争夺：</b>南海地区蕴藏丰富的石油和天然气资源，菲律宾试图通过非法占据仁爱礁等岛礁，获取资源开采权。</li>
+    <li><b>战略误判：</b>菲律宾误判了国际形势，认为通过挑衅可以迫使中国在南海问题上做出让步，同时借助媒体炒作塑造“受害者”形象，获取国际同情。</li>
+    <li><b>长期非法存在：</b>菲律宾自1999年将“马德雷山”号军舰非法坐滩仁爱礁以来，一直试图通过补给和加固船体，将其非法存在永久化。</li>
+  </ol>
+  <div>这些动机综合作用，导致菲律宾在南海问题上采取了一系列挑衅行动，尽管这些行动在法理和实力上都难以得逞。</div>
+  
+  <div class="msg-actions">
+    <div class="msg-action-btn" title="复制">
+      <svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+    </div>
+    <div class="msg-action-btn" title="重新生成">
+      <svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+    </div>
+  </div>
+</div>
+</div>
+<!-- 底栏带上方的“选中交互栏” -->
+<div class="chat-input-container">
+    <div id="ai-selection-bar" class="ai-selection-bar">
+        <div class="ai-selection-bar-text" id="ai-selection-text"></div>
+        <svg class="icon icon-sm" style="cursor: pointer; flex-shrink: 0; margin-left: 8px;" onclick="cancelSelection()" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </div>
+    <div class="chat-input" style="border-top: none;">
+        <input type="text" id="chat-nl-input" placeholder="选中内容可对指定内容改写" oninput="checkChatInput()">
+        <button class="send-btn-circle" id="chat-send-btn" title="发送指令" style="position: absolute; right: 24px; top: 50%; transform: translateY(-50%);">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+        </button>
+    </div>
+</div>
+
+</div>
+</div>
+<script>
+function toggleToolbar() {
+const tb = document.getElementById('toolbar');
+const toggleBtn = document.getElementById('sidebar-toggle-btn');
+tb.classList.toggle('expanded');
+if (tb.classList.contains('expanded')) {
+toggleBtn.title = "收起边栏";
+} else {
+toggleBtn.title = "展开边栏";
+}
+}
+function toggleHistoryList() {
+const list = document.getElementById('history-list-container');
+const arrow = document.getElementById('history-arrow');
+if (list.style.display === 'none') {
+list.style.display = 'flex';
+arrow.classList.remove('collapsed');
+} else {
+list.style.display = 'none';
+arrow.classList.add('collapsed');
+}
+}
+
+// 侧边栏宽度拖动逻辑
+const aiArea = document.getElementById('ai-area');
+const aiResizer = document.getElementById('ai-resizer');
+let isResizing = false;
+
+aiResizer.addEventListener('mousedown', function(e) {
+  isResizing = true;
+  aiResizer.classList.add('resizing');
+  document.body.style.cursor = 'col-resize';
+  e.preventDefault(); 
+});
+
+document.addEventListener('mousemove', function(e) {
+  if (!isResizing) return;
+  // 计算新的宽度 (屏幕总宽 - 鼠标X坐标)
+  let newWidth = window.innerWidth - e.clientX;
+  if (newWidth < 280) newWidth = 280;
+  if (newWidth > 800) newWidth = 800; // 设定一个合理的最大宽度
+  aiArea.style.width = newWidth + 'px';
+});
+
+document.addEventListener('mouseup', function(e) {
+  if (isResizing) {
+    isResizing = false;
+    aiResizer.classList.remove('resizing');
+    document.body.style.cursor = '';
+  }
+});
+
+// ========= 输入框发送按钮联动点亮逻辑 =========
+function checkChatInput() {
+    const input = document.getElementById('chat-nl-input');
+    const btn = document.getElementById('chat-send-btn');
+    if (input.value.trim().length > 0) {
+        btn.classList.add('active');
+        btn.disabled = false;
+    } else {
+        btn.classList.remove('active');
+        btn.disabled = true;
+    }
+}
+
+function checkRewriteInput() {
+    const input = document.getElementById('ai-rewrite-input');
+    const btn = document.getElementById('rewrite-send-btn');
+    if (input.value.trim().length > 0) {
+        btn.classList.add('active');
+        btn.disabled = false;
+    } else {
+        btn.classList.remove('active');
+        btn.disabled = true;
+    }
+}
+
+// ========= 鼠标悬停段落浮现交互柄 & 下拉菜单逻辑 =========
+const docArea = document.getElementById('report-doc-area');
+const paraHandle = document.getElementById('para-handle');
+const paraDropdown = document.getElementById('para-dropdown');
+let isDropdownOpen = false;
+let currentHoveredBlock = null;
+
+docArea.addEventListener('mousemove', function(e) {
+    if (isDropdownOpen || document.getElementById('ai-rewrite-popup').style.display === 'block') return;
+    const target = e.target.closest('.doc-h1, .doc-p, .q-title, .q-list li, .insight-item, .branch-title, .risk-card-body, .strategy-table td');
+    
+    // 排除 handle 和 dropdown 自身
+    if (target && !target.closest('.para-handle') && !target.closest('.para-dropdown')) {
+        currentHoveredBlock = target;
+        const rect = target.getBoundingClientRect();
+        const docRect = docArea.getBoundingClientRect();
+        paraHandle.style.display = 'flex';
+        // 精准定位到段落左侧
+        paraHandle.style.top = (rect.top - docRect.top + docArea.scrollTop - 2) + 'px';
+        paraHandle.style.left = (rect.left - docRect.left + docArea.scrollLeft - 56) + 'px';
+    }
+});
+
+docArea.addEventListener('mouseleave', function() {
+    if (!isDropdownOpen) {
+        paraHandle.style.display = 'none';
+    }
+});
+
+// 优化：鼠标悬停在 icon 上时，选中本段落文字并浮现竖向工具栏
+paraHandle.addEventListener('mouseenter', function(e) {
+    if (!currentHoveredBlock) return;
+    
+    isDropdownOpen = true;
+    paraDropdown.style.display = 'block';
+    
+    const handleRect = paraHandle.getBoundingClientRect();
+    const docRect = docArea.getBoundingClientRect();
+    paraDropdown.style.top = (handleRect.bottom - docRect.top + docArea.scrollTop + 4) + 'px';
+    paraDropdown.style.left = (handleRect.left - docRect.left + docArea.scrollLeft) + 'px';
+    
+    // 应用段落高亮伪选中
+    removeFakeSelection();
+    currentHoveredBlock.classList.add('mock-block-highlight');
+
+    // 在右侧输入框上方展示截断的选中文本
+    let text = currentHoveredBlock.textContent.trim();
+    document.getElementById('ai-selection-text').textContent = text.length > 50 ? text.substring(0, 50) + '...' : text;
+    document.getElementById('ai-selection-bar').style.display = 'flex';
+});
+
+// ========= 文档文字选中悬浮相关交互 (含焦点保持处理) =========
+
+// 清理所有“伪高亮”层
+function removeFakeSelection() {
+    document.querySelectorAll('.mock-highlight').forEach(el => {
+        const parent = el.parentNode;
+        while(el.firstChild) {
+            parent.insertBefore(el.firstChild, el);
+        }
+        parent.removeChild(el);
+    });
+    document.querySelectorAll('.mock-block-highlight').forEach(el => el.classList.remove('mock-block-highlight'));
+    // 防止文本节点碎片化
+    document.getElementById('report-doc-area').normalize();
+}
+
+// 优化：跨区域的交互焦点保持逻辑
+document.addEventListener('mousedown', function(e) {
+    // 1. 如果点击了横向悬浮工具栏或弹窗区，不取消选中
+    if (e.target.closest('#floating-toolbar') || e.target.closest('#ai-rewrite-popup')) return;
+    
+    // 2. 如果点击了右侧聊天输入区域，隐藏横向/竖向工具栏，但【绝不取消选中】
+    if (e.target.closest('.chat-input-container')) {
+        document.getElementById('floating-toolbar').style.display = 'none';
+        document.getElementById('para-dropdown').style.display = 'none';
+        isDropdownOpen = false;
+        return; 
+    }
+    
+    // 3. 如果点击了段落操作柄或下拉菜单，也不取消选中
+    if (e.target.closest('.para-dropdown') || e.target.closest('.para-handle')) return;
+
+    // 4. 其他情况（例如用户在报告内容区再次点击），则彻底取消选中和关闭所有弹窗
+    cancelSelection();
+});
+
+document.addEventListener('mouseup', function(e) {
+    // 忽略特定区域的弹起事件，防止相互覆盖
+    if (e.target.closest('#floating-toolbar') || e.target.closest('.chat-input-container') || e.target.closest('.para-dropdown') || e.target.closest('.para-handle') || e.target.closest('#ai-rewrite-popup')) {
+        return;
+    }
+
+    const selection = window.getSelection();
+    if (!selection.isCollapsed && docArea.contains(selection.anchorNode)) {
+        const text = selection.toString().trim();
+        if (text.length === 0) return;
+        
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        // 1. 显示文档区悬浮横向工具栏
+        const floatingToolbar = document.getElementById('floating-toolbar');
+        floatingToolbar.style.display = 'flex';
+        
+        let tbTop = rect.top + window.scrollY - 52;
+        
+        // 【优化】：工具栏仅在中间文字展示的区域(.doc-container)展示，根据选中文字位置智能左对齐、居中或右对齐
+        const containerEle = document.querySelector('.doc-container');
+        const containerRect = containerEle.getBoundingClientRect();
+        
+        // 文字选区的水平中心点
+        let textCenter = rect.left + rect.width / 2;
+        // 理想情况下，工具栏在选中文字的正上方居中
+        let tbLeft = textCenter - floatingToolbar.offsetWidth / 2;
+        
+        // 限制边界：不能超出文字内容区 (.doc-container) 的左右边缘
+        const minLeft = containerRect.left;
+        const maxLeft = containerRect.right - floatingToolbar.offsetWidth;
+
+        if (tbLeft < minLeft) {
+            tbLeft = minLeft; // 偏左时，自动左边界对齐
+        } else if (tbLeft > maxLeft) {
+            tbLeft = maxLeft; // 偏右时，自动右边界对齐
+        }
+
+        floatingToolbar.style.top = tbTop + 'px';
+        floatingToolbar.style.left = (tbLeft + window.scrollX) + 'px';
+
+        // 2. 在右侧输入框上方展示截断的选中文本
+        document.getElementById('ai-selection-text').textContent = text;
+        document.getElementById('ai-selection-bar').style.display = 'flex';
+
+        // 3. 采用“伪选中（CSS Span 模拟选中颜色）”技术
+        removeFakeSelection();
+        if (range.startContainer === range.endContainer && range.startContainer.nodeType === 3) {
+            const span = document.createElement('span');
+            span.className = 'mock-highlight';
+            try {
+                range.surroundContents(span);
+                selection.removeAllRanges(); // 取消原生选中系统，完全依赖伪选中视觉
+            } catch(err) {
+                // 原生捕获兜底
+            }
+        }
+    }
+});
+
+function cancelSelection() {
+    window.getSelection().removeAllRanges();
+    removeFakeSelection();
+    document.getElementById('floating-toolbar').style.display = 'none';
+    document.getElementById('ai-selection-bar').style.display = 'none';
+    document.getElementById('para-dropdown').style.display = 'none';
+    document.getElementById('ai-rewrite-popup').style.display = 'none';
+    isDropdownOpen = false;
+}
+
+// ========= 绑定工具栏中的“AI改写”按钮行为 =========
+document.querySelectorAll('.ai-rewrite-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        
+        // 隐藏工具栏
+        document.getElementById('floating-toolbar').style.display = 'none';
+        document.getElementById('para-dropdown').style.display = 'none';
+        document.getElementById('para-handle').style.display = 'none';
+        isDropdownOpen = false;
+
+        // 显示AI改写弹窗并自动聚焦
+        const popup = document.getElementById('ai-rewrite-popup');
+        popup.style.display = 'block';
+
+        // 智能定位：尽量靠近当前高亮的内容
+        let rect;
+        const blockHighlight = document.querySelector('.mock-block-highlight');
+        const textHighlight = document.querySelector('.mock-highlight');
+        
+        if (blockHighlight) {
+            rect = blockHighlight.getBoundingClientRect();
+        } else if (textHighlight) {
+            rect = textHighlight.getBoundingClientRect();
+        } else {
+            rect = e.target.getBoundingClientRect();
+        }
+
+        const docRect = docArea.getBoundingClientRect();
+        popup.style.top = (rect.bottom - docRect.top + docArea.scrollTop + 8) + 'px';
+        popup.style.left = (rect.left - docRect.left + docArea.scrollLeft) + 'px';
+
+        document.getElementById('ai-rewrite-input').focus();
+    });
+});
+</script>
+</body>
+</html>

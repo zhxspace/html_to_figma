@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>工作台 - DecisionOne</title>
+<style>
+/* 全局字体与清爽底色 */
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+body { background: #F8FAFC; height: 100vh; display: flex; color: #1E293B; overflow: hidden; -webkit-font-smoothing: antialiased; }
+/* 统一定义 NotebookLM 纯正蓝 */
+:root { --primary-blue: #1A73E8; --primary-blue-light: #E8F0FE; --primary-black: #1E293B; }
+/* SVG 图标通用样式 */
+.icon { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 14px; height: 14px; }
+.icon-lg { width: 20px; height: 20px; }
+/* ================= 侧边栏重构 (Manus 风格) ================= */
+.global-toolbar { width: 68px; background: #FFFFFF; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow-x: hidden; overflow-y: hidden; white-space: nowrap; z-index: 100; flex-shrink: 0;}
+.global-toolbar.expanded { width: 260px; }
+.global-toolbar:hover { overflow-y: auto; }
+.global-toolbar::-webkit-scrollbar { width: 4px; }
+.global-toolbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+.tb-header { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 16px; margin-bottom: 8px; position: relative; }
+.global-toolbar:not(.expanded) .tb-header { justify-content: center; }
+.tb-logo-box { display: flex; align-items: center; gap: 10px; color: var(--primary-black); font-weight: 700; font-size: 16px; text-decoration: none; transition: opacity 0.2s; }
+.global-toolbar:not(.expanded) .tb-logo-box span { display: none; }
+.global-toolbar:not(.expanded) .tb-logo-box { justify-content: center; width: 100%; }
+.global-toolbar:not(.expanded) .sidebar-toggle { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
+.global-toolbar:not(.expanded) .tb-header:hover .tb-logo-box { opacity: 0; }
+.global-toolbar:not(.expanded) .tb-header:hover .sidebar-toggle { opacity: 1; pointer-events: auto; background: #F1F5F9; }
+.sidebar-toggle { background: transparent; border: none; cursor: pointer; color: #64748B; padding: 6px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: 0.2s; outline: none; }
+.sidebar-toggle:hover { background: #F1F5F9; color: var(--primary-black); }
+.tb-nav { padding: 0 12px; margin-bottom: 24px; }
+.tb-item { display: flex; align-items: center; color: #1E293B; text-decoration: none; padding: 10px 12px; border-radius: 8px; margin-bottom: 4px; transition: 0.2s; font-weight: 500; cursor: pointer; font-size: 14px; }
+.global-toolbar:not(.expanded) .tb-item { justify-content: center; padding: 12px 0; }
+.tb-item:hover { background: #F1F5F9; }
+.tb-item.active { background: var(--primary-blue-light); color: var(--primary-blue); }
+.tb-item svg { flex-shrink: 0; }
+.global-toolbar.expanded .tb-item svg { margin-right: 12px; }
+.global-toolbar:not(.expanded) .tb-item span { display: none; }
+.collapsed-history-btn { display: none !important; }
+.global-toolbar:not(.expanded) .collapsed-history-btn { display: flex !important; }
+.history-section { display: flex; flex-direction: column; padding: 0 12px; opacity: 1; transition: opacity 0.2s; }
+.global-toolbar:not(.expanded) .history-section { display: none; }
+.history-header { font-size: 14px; color: #64748B; font-weight: 600; padding: 0 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+.history-arrow-icon { transition: transform 0.3s; }
+.history-arrow-icon.collapsed { transform: rotate(-90deg); }
+.history-search { display: flex; align-items: center; background: #F8FAFC; border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; margin: 0 0 12px 0; gap: 8px; color: #64748B; transition: 0.2s; }
+.history-search:focus-within { border-color: #CBD5E1; background: #FFFFFF; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+.history-search input { border: none; background: transparent; outline: none; width: 100%; font-size: 13px; color: #1E293B; }
+.history-list { display: flex; flex-direction: column; gap: 2px; }
+.hist-item { font-size: 14px; color: #1E293B; padding: 10px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+.hist-item:hover { background: #F1F5F9; }
+/* ================= 底部用户信息区 ================= */
+.user-profile { margin-top: auto; padding: 16px; display: flex; align-items: center; gap: 12px; border-top: 1px solid #E2E8F0; cursor: pointer; transition: 0.2s; }
+.user-profile:hover { background: #F1F5F9; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-black); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; font-size: 14px; }
+.user-name { font-size: 14px; font-weight: 500; color: #1E293B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.global-toolbar:not(.expanded) .user-profile { padding: 16px 0; justify-content: center; }
+.global-toolbar:not(.expanded) .user-name { display: none; }
+.wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+/* 顶部 Header */
+.header { height: 60px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(8px); border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 14px; flex-shrink: 0; z-index: 50;}
+.ws-body { flex: 1; display: flex; overflow: hidden; position: relative; }
+/* ================= 左侧边栏及收缩功能 ================= */
+.ws-left { width: 260px; min-width: 200px; max-width: 400px; background: #FFFFFF; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease; box-shadow: 2px 0 8px rgba(0,0,0,0.02); z-index: 10; position: relative;}
+body.left-collapsed .ws-left { width: 0 !important; min-width: 0 !important; border-right: none; overflow: hidden; padding: 0; box-shadow: none;}
+body.left-collapsed #dragLeft { display: none; }
+.panel-btn { cursor: pointer; color: #64748B; display: flex; align-items: center; justify-content: center; padding: 6px; border-radius: 6px; transition: 0.2s; background: transparent; border: none; outline: none; }
+.panel-btn:hover { color: var(--primary-blue); background: var(--primary-blue-light); }
+/* 展开左侧的悬浮按钮 */
+.expand-tab-left { position: absolute; top: 12px; left: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; padding: 8px; cursor: pointer; z-index: 30; color: #64748B; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: 0.2s; border-radius: 8px;}
+body.left-collapsed .expand-tab-left { display: flex; }
+/* 拖拽手柄 */
+.resizer { width: 4px; background: transparent; cursor: col-resize; z-index: 20; transition: background 0.2s; }
+.resizer:hover, .resizer.dragging { background: var(--primary-blue); }
+/* 左侧面板内容 */
+.panel-section { padding: 16px 20px; border-bottom: 1px solid #E2E8F0; flex-shrink: 0; }
+.panel-title { font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+.panel-title-text { display: flex; align-items: center; gap: 6px; }
+/* 树状节点 */
+.tree-node { font-size: 13px; padding: 8px 0 8px 16px; border-left: 2px solid #E2E8F0; margin-left: 8px; cursor: pointer; color: #475569; transition: 0.2s;}
+.tree-node.active { border-left-color: var(--primary-blue); color: var(--primary-blue); font-weight: bold; background: linear-gradient(90deg, var(--primary-blue-light) 0%, transparent 100%); }
+.tree-branch { margin-left: 24px; padding-left: 12px; border-left: 1px dashed #CBD5E1; margin-top: 4px;}
+.tree-node.disabled { color: #CBD5E1; cursor: not-allowed; pointer-events: none; }
+.tree-node .hover-show { opacity: 0; visibility: hidden; transition: 0.2s; }
+.tree-node:hover .hover-show { opacity: 1; visibility: visible; }
+/* ================= 中区：信息流式布局 ================= */
+.ws-center { flex: 1; display: flex; flex-direction: column; background: #F8FAFC; position: relative; overflow: hidden;}
+.center-top-bar { background: transparent; padding: 16px 24px 8px 24px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 5;}
+.center-top-title { font-size: 14px; font-weight: bold; color: #1E293B; display: flex; align-items: center; gap: 8px;}
+/* 流式对话容器 */
+.chat-flow { flex: 1; overflow-y: auto; padding: 0 24px 24px 24px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+/* 核心卡片样式 */
+.flow-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.02); }
+.flow-card-title { font-size: 14px; font-weight: bold; color: #1E293B; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.flow-card-desc { font-size: 12px; color: #64748B; margin-bottom: 16px; }
+/* 智能体文字标签排版 */
+.agent-row { display: flex; align-items: flex-start; margin-bottom: 10px; transition: opacity 0.3s; }
+.agent-row:last-child { margin-bottom: 0; }
+.agent-row-title { font-size: 13px; font-weight: bold; color: #1E293B; width: 100px; flex-shrink: 0; padding-top: 6px; }
+.agent-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.agent-tag { display: inline-flex; align-items: center; padding: 6px 12px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; font-size: 12px; color: #475569; cursor: pointer; transition: 0.2s; font-weight: 500; }
+.agent-tag:hover, .agent-tag.selected { background: var(--primary-blue-light); color: var(--primary-blue); border-color: var(--primary-blue); }
+.agent-tag.disabled { background: #F8FAFC; border-color: #E2E8F0; color: #94A3B8; cursor: not-allowed; }
+/* 态势总览仪表盘 */
+.dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+.metric { background: #F8FAFC; padding: 12px 16px; border-radius: 10px; border: 1px solid #E2E8F0; }
+.metric-title { font-size: 12px; color: #64748B; font-weight: bold; margin-bottom: 6px; }
+.metric-val { font-size: 18px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+.metric-val.red { color: #EF4444; }
+.metric-val.yellow { color: #F59E0B; }
+.metric-trend { font-size: 12px; font-weight: bold; padding: 2px 4px; border-radius: 4px; background: #FFFFFF;}
+.trend-up { color: #EF4444; }
+.trend-down { color: #10B981; }
+.metric-desc { font-size: 11px; color: #94A3B8; margin-top: 6px; line-height: 1.4; }
+.env-shortcuts { display: flex; gap: 12px; flex-wrap: wrap; border-top: 1px dashed #E2E8F0; padding-top: 16px;}
+.shortcut-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 20px; font-size: 12px; color: #475569; cursor: pointer; transition: 0.2s; font-weight: 500;}
+.shortcut-btn:hover { border-color: var(--primary-blue); color: var(--primary-blue); background: var(--primary-blue-light); }
+/* 日志与决策内容区 */
+.log-content { font-size: 12px; line-height: 1.8; color: #475569; max-height: 160px; overflow-y: auto; padding-right: 8px;}
+.log-item { margin-bottom: 8px; border-bottom: 1px dashed #E2E8F0; padding-bottom: 8px;}
+.log-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0;}
+.agent-ph { color: #F59E0B; font-weight: 600;}
+.agent-cn { color: #EF4444; font-weight: 600;}
+.agent-us { color: #10B981; font-weight: 600;}
+.decision-list { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #1E293B; line-height: 1.6;}
+.decision-list span.nation { font-weight: bold; display: inline-block; width: 60px;}
+/* 星级打分组件 */
+.star-rating span { font-size: 16px; cursor: pointer; color: #CBD5E1; transition: 0.2s; }
+.star-rating span:hover, .star-rating span.active { color: #F59E0B; }
+/* ================= 报告全量展示专区样式 ================= */
+.report-full-content { font-size: 13px; color: #1E293B; line-height: 1.8; }
+.report-full-content h4 { font-size: 14px; color: var(--primary-blue); margin: 16px 0 8px 0; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; }
+.report-full-content h4:first-child { margin-top: 0; }
+.report-full-content p { margin-bottom: 12px; }
+.report-full-content ul { padding-left: 20px; margin-bottom: 12px; color: #475569;}
+.report-full-content li { margin-bottom: 4px; }
+.report-risk-tag { display: inline-block; background: #FEF2F2; color: #EF4444; padding: 2px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #FCA5A5; margin-right: 6px;}
+.report-advise-tag { display: inline-block; background: #F0FDF4; color: #10B981; padding: 2px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #6EE7B7; margin-right: 6px;}
+/* ================= 底部系统操作台 ================= */
+.unified-control-module { display: flex; flex-direction: column; gap: 12px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px 20px; margin: 0 24px 24px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); flex-shrink: 0;}
+.control-row { display: flex; justify-content: space-between; align-items: center; }
+.status-text { font-size: 13px; color: #1E293B; display: flex; align-items: center; }
+.status-badge { color: var(--primary-blue); font-weight: bold; margin-right: 8px; background: var(--primary-blue-light); padding: 2px 8px; border-radius: 4px;}
+.control-btn-group { display: flex; gap: 10px; align-items: center; }
+.control-btn { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid transparent; cursor: pointer; transition: 0.2s; outline: none; }
+.control-btn.operable { color: var(--primary-blue); border-color: var(--primary-blue); background: var(--primary-blue-light); }
+.control-btn.operable:hover { background: var(--primary-blue); color: #FFFFFF; box-shadow: 0 4px 10px rgba(26,115,232,0.25); }
+.control-btn.disabled { color: #94A3B8; border-color: #E2E8F0; background: #F8FAFC; cursor: not-allowed; }
+.system-progress-wrapper { display: flex; align-items: center; justify-content: center; margin-bottom: 8px; padding: 0 10px;}
+.progress-track { width: 100%; max-width: 400px; height: 4px; background: #E2E8F0; border-radius: 4px; position: relative;}
+.progress-line-fill { position: absolute; top: 0; left: 0; height: 100%; width: 50%; background: var(--primary-blue); transition: width 0.5s ease; border-radius: 4px;}
+/* 进度条小圆圈保留 */
+.progress-line-fill::after {
+content: '';
+position: absolute;
+top: 50%;
+right: 0;
+transform: translate(50%, -50%);
+width: 12px;
+height: 12px;
+background: #FFFFFF;
+border: 2px solid var(--primary-blue);
+border-radius: 50%;
+box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+transition: transform 0.2s;
+cursor: pointer;
+}
+.progress-line-fill::after:hover {
+transform: translate(50%, -50%) scale(1.2);
+}
+.nl-input { display: flex; width: 100%; position: relative; align-items: center;}
+.nl-input input { flex: 1; padding: 12px 48px 12px 16px; border: 1px solid #E2E8F0; border-radius: 20px; outline: none; background: #FAFAFB; font-size: 13px; transition: 0.2s; color: #1E293B; }
+.nl-input input:focus { border-color: var(--primary-blue); background: #FFFFFF; box-shadow: 0 0 0 3px var(--primary-blue-light); }
+.send-btn { position: absolute; right: 6px; width: 30px; height: 30px; border-radius: 50%; background: var(--primary-black); color: #FFFFFF; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
+.send-btn:hover { background: #334155; box-shadow: 0 4px 10px rgba(0,0,0,0.15);}
+/* ================= 右侧面板 ================= */
+.ws-right { width: 340px; min-width: 280px; max-width: 550px; background: #FFFFFF; border-left: 1px solid #E2E8F0; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease; position: relative; box-shadow: -2px 0 8px rgba(0,0,0,0.02); z-index: 10;}
+.tabs { display: flex; border-bottom: 1px solid #E2E8F0; position: relative; padding-left: 40px; }
+.tab { flex: 1; text-align: center; padding: 12px; font-size: 13px; cursor: pointer; color: #64748B; border-bottom: 2px solid transparent; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 500;}
+.tab.active { color: var(--primary-blue); border-bottom-color: var(--primary-blue); font-weight: bold; }
+.right-content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.card { background: #FFFFFF; border: 1px solid #E2E8F0; padding: 16px; border-radius: 12px; flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.02);}
+.card-title { font-size: 13px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; color: #1E293B;}
+.card-title-text { display: flex; align-items: center; gap: 6px; }
+.tag { display: inline-block; padding: 4px 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 20px; font-size: 12px; margin: 0 4px 8px 0; cursor: pointer; color: #475569;}
+.tag-dashed { border-style: dashed; color: #64748B; background: transparent; }
+.tag-dashed:hover { border-color: var(--primary-blue); color: var(--primary-blue); background: var(--primary-blue-light); }
+.kb-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748B; cursor: pointer; padding: 8px 12px; border-radius: 6px; transition: 0.2s; border: 1px solid transparent;}
+.kb-item:hover { background: #F1F5F9; color: #1E293B;}
+.kb-item.primary { color: var(--primary-blue); background: var(--primary-blue-light); border-color: #CBD5E1; font-weight: 500;}
+.kb-item.primary:hover { background: #D2E3FC; border-color: var(--primary-blue); }
+body.right-collapsed .ws-right { width: 0 !important; min-width: 0 !important; border-left: none; overflow: hidden; padding: 0; box-shadow: none;}
+body.right-collapsed #dragRight { display: none; }
+.expand-tab-right { position: absolute; top: 12px; right: 12px; background: #FFFFFF; border: 1px solid #E2E8F0; padding: 8px; cursor: pointer; z-index: 30; color: #64748B; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: 0.2s; border-radius: 8px;}
+body.right-collapsed .expand-tab-right { display: flex; }
+.right-sidebar-collapse { position: absolute; left: 8px; top: 10px; z-index: 10;}
+/* 可编辑与代码高亮 */
+.editable-item { position: relative; border-radius: 8px; padding: 6px; margin: -6px; transition: 0.2s; border: 1px solid transparent; }
+.editable-item:hover { background: #FAFAFB; border-color: #E2E8F0; }
+.btn-outline { background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; outline: none; font-weight: 500; transition: 0.2s;}
+.btn-outline:hover { background: #F8FAFC; border-color: #94A3B8; }
+.agent-detail-tag { background: var(--primary-blue-light); color: var(--primary-blue); padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; display: inline-block;}
+.agent-detail-tag.dashed { background: transparent; border: 1px dashed #CBD5E1; color: #64748B; cursor: pointer; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+/* 自定义推荐交互项样式 */
+.recommend-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #FAFAFB; border: 1px solid #E2E8F0; border-radius: 20px; font-size: 12px; color: #475569; cursor: pointer; transition: 0.2s; }
+.recommend-item:hover { background: var(--primary-blue-light); border-color: var(--primary-blue); color: var(--primary-blue); }
+.recommend-item svg { color: #94A3B8; transition: 0.2s; flex-shrink: 0; }
+.recommend-item:hover svg { color: var(--primary-blue); }
+/* 白色代码区样式 */
+.code-block { background: #FFFFFF; color: #1E293B; border: 1px solid #E2E8F0; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; max-height: 400px; overflow-y: auto;}
+.c-comment { color: #059669; }       /* 深绿色注释 */
+.c-keyword { color: #9333EA; }       /* 深紫色关键字 */
+.c-class { color: #2563EB; }         /* 深蓝色类/函数名 */
+.c-number { color: #D97706; }        /* 橙黄色数字 */
+
+/* 暗示模块收起后的视觉提示 */
+.chat-flow-hint {
+display: none;
+align-items: center;
+justify-content: center;
+gap: 8px;
+color: #64748B;
+font-size: 13px;
+background: #FFFFFF;
+border: 1px dashed #CBD5E1;
+border-radius: 12px;
+margin: 0 24px 24px 24px;
+padding: 16px;
+cursor: pointer;
+transition: 0.2s;
+}
+.chat-flow-hint:hover {
+background: #F1F5F9;
+border-color: #94A3B8;
+color: #1E293B;
+}
+</style>
+</head>
+<body>
+<div class="global-toolbar" id="toolbar">
+<div class="tb-header">
+<a href="home.html" class="tb-logo-box" title="DecisionOne 首页">
+<svg class="icon icon-lg" style="color:var(--primary-black);" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 18C4.686 18 2 15.314 2 12c0-3.314 2.686-6 6-6 2.5 0 4.8 1.5 5.5 3.5" />
+<path d="M16 6c3.314 0 6 2.686 6 6 0 3.314-2.686 6-6 6-2.5 0-4.8-1.5-5.5-3.5" />
+</svg>
+<span>DecisionOne</span>
+</a>
+<button id="sidebar-toggle-btn" class="sidebar-toggle" onclick="toggleToolbar()" title="展开边栏">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+</button>
+</div>
+<div class="tb-nav">
+<a href="home.html" class="tb-item">
+<svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<span>新建任务</span>
+</a>
+<a href="knowledge.html" class="tb-item">
+<svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+<span>知识库</span>
+</a>
+<div class="tb-item collapsed-history-btn" onclick="toggleToolbar()" title="历史任务">
+<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+</div>
+</div>
+<div class="history-section">
+<div class="history-header">
+<div style="display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="toggleHistoryList()">
+<span>历史任务</span>
+<svg id="history-arrow" class="icon icon-sm history-arrow-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+<svg class="icon icon-sm" style="cursor: pointer;" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+</div>
+<div class="history-list" id="history-list-container">
+<div class="hist-item" onclick="window.location.href='workspace.html'">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+菲律宾仁爱礁强行运补事件推演
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+关税后续问题推演评估及应对
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+中东原油市场短期走势预测分析
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+东海防空识别区常态化巡航评估
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+半导体供应链制裁极限施压演进
+</div>
+</div>
+</div>
+<!-- 底部用户信息区 -->
+<div class="user-profile">
+<div class="avatar">A</div>
+<div class="user-name">admin</div>
+</div>
+</div>
+<div class="wrapper">
+<div class="header" style="position: relative;">
+<div><b>当前任务：</b>菲律宾仁爱礁强行运补事件推演</div>
+<!-- 顶部进度展示区域 -->
+<div style="position: absolute; left: 260px; right: 340px; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 13px; color: #94A3B8; font-weight: 500;">
+<!-- 已完成的打对钩 -->
+<span style="color: #1E293B; display: flex; align-items: center; gap: 4px;"><svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>新建任务</span>
+<span style="width: 20px; height: 1px; background: #1E293B;"></span>
+<span style="color: #1E293B; display: flex; align-items: center; gap: 4px;"><svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>配置模板</span>
+<span style="width: 20px; height: 1px; background: #1E293B;"></span>
+<span style="color: #1E293B; display: flex; align-items: center; gap: 4px;"><svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>知识调研</span>
+<span style="width: 20px; height: 1px; background: #1E293B;"></span>
+<span style="color: var(--primary-blue); font-weight: bold; font-size: 14px;">任务推演</span>
+<span style="width: 20px; height: 1px; background: #E2E8F0;"></span>
+<span>完成</span>
+</div>
+<div style="display: flex; align-items: center;">
+模式：标准模式
+<button class="btn-outline" style="margin-left:12px; padding: 0 16px; height: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; border-radius: 8px;">分享</button>
+<button class="btn" style="margin-left:8px; padding: 0 16px; height: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; background:#1E293B; color:#fff; border: 1px solid #1E293B; border-radius:8px;" onclick="window.location.href='report.html'">查看报告</button>
+</div>
+</div>
+<div class="ws-body">
+<!-- 呼出左侧边栏的悬浮按钮 -->
+<button class="expand-tab-left panel-btn" onclick="toggleLeftSidebar()" title="展开任务面板">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+</button>
+<div class="ws-left" id="ws-left">
+<!-- 模块一：任务设定 -->
+<div class="panel-section">
+<div class="panel-title">
+<span class="panel-title-text"><svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg> 任务设定</span>
+<button class="panel-btn" onclick="toggleLeftSidebar()" title="收起面板">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+</button>
+</div>
+<div class="editable-item" style="font-size: 13px; margin-top: 4px; color: #475569; line-height: 1.5;">
+议题：<span style="color: #1E293B; font-weight: bold;">仁爱礁冲突</span><br>
+<span style="margin-top:4px; display:block;">初始事件：<span style="color: #1E293B; font-weight: bold;">菲补给船强行</span></span>
+</div>
+</div>
+<!-- 模块二：推演分支导航 -->
+<div class="panel-section" style="flex:1; overflow-y:auto; border-bottom: 1px solid #E2E8F0;">
+<div class="panel-title">
+<span class="panel-title-text"><svg class="icon" viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg> 推演分支导航</span>
+</div>
+<div class="tree-node active" id="nav-round0" onclick="switchRound(0)">Round 0: 初始态势</div>
+<div class="tree-node" id="nav-round1" onclick="switchRound(1)">Round 1: 运补事件</div>
+<div class="tree-node" id="nav-round2" onclick="switchRound(2)" style="display: flex; justify-content: space-between; align-items: center; padding-right: 16px;">
+<span>Round 2: 对峙升级</span>
+<svg class="icon icon-sm hover-show" viewBox="0 0 24 24" onclick="event.stopPropagation(); addBranch('branch-container-round2', 2)" title="添加新分支"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+</div>
+<div class="tree-branch" id="branch-container-round2">
+<div class="tree-node" id="nav-branch-a" onclick="switchRound(2, 'nav-branch-a')">分支A: 美舰入场</div>
+<div class="tree-node" id="nav-branch-b" onclick="switchRound(2, 'nav-branch-b')">分支B: 自然演化</div>
+</div>
+<div class="tree-node disabled">Round 3: (待演进)</div>
+<div class="tree-node disabled">Round 4: (待演进)</div>
+<div class="tree-node disabled">Round 5: (待演进)</div>
+</div>
+<!-- 模块三：知识库模块 -->
+<div class="panel-section" style="border-bottom: none; padding-bottom: 24px;">
+<div class="panel-title">
+<span class="panel-title-text"><svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg> 知识库</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px;">
+<div class="kb-item" style="color: #475569;" title="查看文档">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+<span style="font-size: 13px; color: #475569;">南海历史争端.pdf</span>
+</div>
+</div>
+</div>
+</div>
+<div class="resizer" id="dragLeft"></div>
+<!-- ================= 中区：对话流式操作区域 ================= -->
+<div class="ws-center" id="ws-center">
+<div class="center-top-bar">
+<div style="display: flex; align-items: center; gap: 12px;">
+<div class="center-top-title">
+<svg class="icon icon-lg" style="color:var(--primary-blue);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path></svg>
+多方博弈关系与态势总览
+</div>
+<select onchange="changeView(this.value)" style="padding: 4px 10px; border: 1px solid #E2E8F0; border-radius: 6px; outline: none; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; background:#FFFFFF;">
+<option value="global">🌐 全局视角</option>
+<option value="cn">🇨🇳 中方视角</option>
+<option value="ph">🇵🇭 菲方视角</option>
+<option value="us">🇺🇸 美方视角</option>
+</select>
+</div>
+
+<!-- ================= 新增：右侧收起展开与锚点导航控制 ================= -->
+<div style="display: flex; align-items: center; gap: 8px;">
+<div style="display: flex; gap: 4px;">
+<button class="panel-btn" id="nav-icon-agent" onclick="scrollToCard('card-agent-overview')" title="快速跳转: 智能体总览">
+<svg class="icon" style="color:#64748B;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+</button>
+<button class="panel-btn" id="nav-icon-dashboard" onclick="scrollToCard('card-dashboard')" title="快速跳转: 态势总览与核心环境指标">
+<svg class="icon" style="color:#64748B;" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+</button>
+<button class="panel-btn" id="nav-icon-interaction" onclick="scrollToCard('card-interaction')" title="快速跳转: 全景交互细节" style="display: none;">
+<svg class="icon" style="color:#64748B;" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line></svg>
+</button>
+<button class="panel-btn" id="nav-icon-decision" onclick="scrollToCard('card-decision')" title="快速跳转: 本轮国家最终决策" style="display: none;">
+<svg class="icon" style="color:#64748B;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle></svg>
+</button>
+<button class="panel-btn" id="nav-icon-report" onclick="scrollToCard('card-report')" title="快速跳转: 阶段报告" style="display: none;">
+<svg class="icon" style="color:#64748B;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+</button>
+</div>
+<div style="width: 1px; height: 16px; background: #E2E8F0; margin: 0 4px;"></div>
+<button class="panel-btn" id="btn-toggle-chat-flow" onclick="toggleChatFlow()" title="收起总览模块">
+<svg id="toggle-chat-flow-icon" class="icon" viewBox="0 0 24 24" style="transition: transform 0.3s; color:#64748B;"><polyline points="18 15 12 9 6 15"></polyline></svg>
+</button>
+</div>
+<!-- =================================================================== -->
+
+</div>
+<!-- 核心滚动信息流 -->
+<div class="chat-flow" id="chat-flow">
+<!-- 智能体区域 -->
+<div class="flow-card" id="card-agent-overview">
+<div class="flow-card-title">
+<svg class="icon" style="color:var(--primary-blue);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+智能体总览 <span id="agent-overview-count">(共 9 个)</span>
+</div>
+<div class="flow-card-desc">展示本次推演的所有参与方及其层级关系。点击任意节点即可在右侧面板查看详细配置与画像。</div>
+<div class="agent-row" data-nation="cn">
+<div class="agent-row-title">🇨🇳 中方 (1 个):</div>
+<div class="agent-tags">
+<span class="agent-tag">中国决策者</span>
+</div>
+</div>
+<div class="agent-row" data-nation="ph">
+<div class="agent-row-title">🇵🇭 菲方 (5 个):</div>
+<div class="agent-tags">
+<span class="agent-tag" id="ph-node" onclick="selectAgent()">总统</span>
+<span class="agent-tag">外交部长</span>
+<span class="agent-tag">国防部长</span>
+<span class="agent-tag">外交部</span>
+<span class="agent-tag">武装部队</span>
+</div>
+</div>
+<div class="agent-row" data-nation="us">
+<div class="agent-row-title">🇺🇸 美方 (3 个):</div>
+<div class="agent-tags">
+<span class="agent-tag">总统</span>
+<span class="agent-tag">外交部长</span>
+<span class="agent-tag">国防部长</span>
+</div>
+</div>
+</div>
+<!-- 态势总览 -->
+<div class="flow-card" id="card-dashboard">
+<div class="flow-card-title">
+<svg class="icon" style="color:var(--primary-blue);" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+态势总览与核心环境指标
+</div>
+<div class="flow-card-desc">当前 T=0 时刻的宏观数据环境。</div>
+
+<!-- 全局视角特供视图：从上到下依次展示三方 -->
+<div id="dashboard-global-view">
+<div style="font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 8px;">🇨🇳 中方</div>
+<div class="dashboard">
+<div class="metric">
+<div class="metric-title">军事紧张度</div>
+<div class="metric-val yellow">52% <span class="metric-trend trend-down">↓</span></div>
+<div class="metric-desc">海警现场管控有效，驱离非必要摩擦。</div>
+</div>
+<div class="metric">
+<div class="metric-title">外交压力</div>
+<div class="metric-val yellow">45% <span class="metric-trend trend-down">↓</span></div>
+<div class="metric-desc">掌握外交主动，东盟内部倾向中立。</div>
+</div>
+<div class="metric">
+<div class="metric-title">国内舆论</div>
+<div class="metric-val red">极稳 <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">国内民众对海警维权行动高度支持。</div>
+</div>
+<div class="metric">
+<div class="metric-title">反华情绪指数</div>
+<div class="metric-val yellow">12% <span class="metric-trend trend-down">↓</span></div>
+<div class="metric-desc">国内情绪稳定，主张坚决捍卫主权。</div>
+</div>
+</div>
+<hr style="border: none; border-top: 1px dashed #E2E8F0; margin: 0 0 16px 0;">
+
+<div style="font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 8px;">🇵🇭 菲方</div>
+<div class="dashboard">
+<div class="metric">
+<div class="metric-title">军事紧张度</div>
+<div class="metric-val red">88% <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">前线补给受阻，军方主张强硬应对。</div>
+</div>
+<div class="metric">
+<div class="metric-title">外交压力</div>
+<div class="metric-val red">85% <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">寻求国际仲裁和外部势力干预遇阻。</div>
+</div>
+<div class="metric">
+<div class="metric-title">国内舆论</div>
+<div class="metric-val red">激进 <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">民族主义情绪高涨，要求政府采取行动。</div>
+</div>
+<div class="metric">
+<div class="metric-title">反华情绪指数</div>
+<div class="metric-val red">92% <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">媒体炒作水炮事件，对华敌意升温。</div>
+</div>
+</div>
+<hr style="border: none; border-top: 1px dashed #E2E8F0; margin: 0 0 16px 0;">
+
+<div style="font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 8px;">🇺🇸 美方</div>
+<div class="dashboard" style="margin-bottom: 16px;">
+<div class="metric">
+<div class="metric-title">军事紧张度</div>
+<div class="metric-val red">78% <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">印太司令部提升戒备，航母编队游弋。</div>
+</div>
+<div class="metric">
+<div class="metric-title">外交压力</div>
+<div class="metric-val yellow">55% <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">协调盟友发表联合声明，施压中方。</div>
+</div>
+<div class="metric">
+<div class="metric-title">国内舆论</div>
+<div class="metric-val yellow">关注 <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc">两党对南海局势保持高度警惕。</div>
+</div>
+<div class="metric">
+<div class="metric-title">反华情绪指数</div>
+<div class="metric-val yellow">68% <span class="metric-trend trend-down">↓</span></div>
+<div class="metric-desc">智库与媒体聚焦大国竞争，情绪固化。</div>
+</div>
+</div>
+</div>
+
+<!-- 单一方视角特供视图（初始隐藏） -->
+<div id="dashboard-single-view" style="display: none;">
+<div class="dashboard">
+<div class="metric">
+<div class="metric-title">军事紧张度</div>
+<div class="metric-val red" id="metric-val-1">74% <span class="metric-trend trend-down">↓</span></div>
+<div class="metric-desc" id="metric-desc-1">军事动作趋稳，接触风险下降。</div>
+</div>
+<div class="metric">
+<div class="metric-title">外交压力</div>
+<div class="metric-val yellow" id="metric-val-2">66% <span class="metric-trend trend-down">↓</span></div>
+<div class="metric-desc" id="metric-desc-2">东盟磋商获得部分缓和空间。</div>
+</div>
+<div class="metric">
+<div class="metric-title">国内舆论</div>
+<div class="metric-val red" id="metric-val-3">强硬 <span class="metric-trend trend-up">↑</span></div>
+<div class="metric-desc" id="metric-desc-3">避免战争舆论增加，但核心立场依旧强硬。</div>
+</div>
+<div class="metric">
+<div class="metric-title">反华情绪指数</div>
+<div class="metric-val red" id="metric-val-4">83% <span class="metric-trend trend-down">↓</span></div>
+<div class="metric-desc" id="metric-desc-4">缺少新冲突画面，情绪略降仍高位运行。</div>
+</div>
+</div>
+</div>
+
+<!-- 快捷入口 -->
+<div class="env-shortcuts">
+<button class="shortcut-btn" onclick="openRightEnv()">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect><line x1="16" y1="8" x2="16" y2="8.01"></line><line x1="8" y1="8" x2="12" y2="8"></line></svg>
+舆论与媒体分析
+</button>
+<button class="shortcut-btn" onclick="openRightEnv()">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+关键影响因素
+</button>
+</div>
+</div>
+
+<!-- 全景交互细节 -->
+<div class="flow-card" id="card-interaction" style="display: none;">
+<div class="flow-card-title" style="cursor: pointer; justify-content: space-between;" onclick="toggleFlowCard('interaction')">
+<span style="display: flex; align-items: center; gap: 6px;">
+<svg class="icon" style="color:var(--primary-blue);" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line></svg>
+全景交互细节
+</span>
+<svg id="toggle-icon-interaction" class="icon icon-sm" style="display: none; transition: transform 0.3s;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+<div id="content-interaction">
+<div class="flow-card-desc">多方智能体在当前轮次的初步意图与协商日志。</div>
+<div class="log-content">
+<div class="log-item"><span class="agent-ph">[菲律宾总统]</span> ↔ <span class="agent-ph">[菲律宾国防部长]</span>：维持上一轮戒备状态，暂不增加风险性航行。（单向信息传递）</div>
+<div class="log-item"><span class="agent-ph">[菲律宾外交部长]</span> ➔ <span class="agent-cn">[中国决策者]</span>：保持外交交涉，重申主权立场。（单向信息传递）</div>
+<div class="log-item"><span class="agent-us">[美国总统]</span> ➔ <span class="agent-ph">[菲律宾总统]</span>：承诺继续在该区域保持存在，同时支持外交降温。（单向信息传递）</div>
+<div class="log-item"><span class="agent-cn">[中国决策者]</span> ➔ <span class="agent-ph">[菲律宾外交部长]</span>：重申要求菲方停止挑衅，但同意保持军事沟通渠道。（单向信息传递）</div>
+<div class="log-item"><span class="agent-ph">[菲律宾总统]</span> ↔ <span class="agent-ph">[菲律宾外交部长]</span>、<span class="agent-ph">[菲律宾国防部长]</span>：讨论是否降低海上巡逻力度，暂决定持续维持高位巡逻但减少靠近中方执法船的概率。（多方协商）</div>
+</div>
+</div>
+</div>
+
+<!-- 本轮国家最终决策 -->
+<div class="flow-card" id="card-decision" style="display: none;">
+<div class="flow-card-title">
+<svg class="icon" style="color:var(--primary-blue);" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle></svg>
+本轮国家最终决策
+</div>
+<div class="decision-list">
+<div class="decision-row" data-nation="ph"><span class="nation">🇵🇭 菲方：</span>维持高位巡逻或戒备，暂不推进新运补，持续外交抗议。</div>
+<div class="decision-row" data-nation="cn"><span class="nation">🇨🇳 中方：</span>保持现场执法监控，口头降温但坚持阻止运补。</div>
+<div class="decision-row" data-nation="us"><span class="nation">🇺🇸 美方：</span>关注局势，不增加军事动态，仅口头支持菲外交立场。</div>
+</div>
+</div>
+
+<!-- 阶段报告 -->
+<div class="flow-card" id="card-report" style="display: none;">
+<div class="flow-card-title" style="cursor: pointer; justify-content: space-between;" onclick="toggleFlowCard('report')">
+<span style="display: flex; align-items: center; gap: 6px;">
+<svg class="icon" style="color:var(--primary-blue);" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+阶段报告
+</span>
+<svg id="toggle-icon-report" class="icon icon-sm" style="display: none; transition: transform 0.3s;" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+<div id="content-report">
+<div class="flow-card-desc" style="margin-bottom: 12px;">基于当前 T=0 时刻的宏观数据与多方初始意图，系统已生成全量评估洞察：</div>
+<!-- 完整的报告内容呈现区域 -->
+<div style="background: #FAFAFB; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 16px;">
+<div class="report-full-content">
+<h4>一、核心问题回答</h4>
+<p><strong>问题1：菲律宾强行进行运补的动机是什么？</strong><br>
+这一行为在任何情景下都会直接推高地区军事紧张水平，并引发菲律宾国内的民族主义情绪反应。通过多智能体推演分析，动机包括：<br>
+1. <span style="font-weight:bold; color:#1E293B;">国内政治压力：</span>小马科斯政府需转移国内经济与通胀压力焦点。<br>
+2. <span style="font-weight:bold; color:#1E293B;">试探美方底线：</span>迫使美国通过《美菲共同防御条约》兑现更多实质性安全承诺。<br>
+3. <span style="font-weight:bold; color:#1E293B;">固化非法存在：</span>通过补给建材防止“马德雷山号”解体。</p>
+<h4>二、态势演化复盘</h4>
+<p>在当前的 T=0 轮次中，整体局势处于<strong>“战术僵持期”</strong>：<br>
+各方表现出明显的“引而不发”态势。中方海警现场控制力充足但口头释放降温信号；菲律宾在舆论端保持攻势但暂缓了强行抵近动作；美国航母打击群在周边游弋，但尚未进行直接干预，主要通过声明提供情报与外交背书。</p>
+<h4>三、关键风险点清单</h4>
+<ul>
+<li><span class="report-risk-tag">擦枪走火风险</span>多方舰机近距离机动，在无沟通或沟通延迟情况下可能发生意外冲突。</li>
+<li><span class="report-risk-tag">对抗固化风险</span>外部大国军事存在常态化，摩擦变成长期高压状态，降低外交斡旋空间。</li>
+<li><span class="report-risk-tag">舆论绑架风险</span>国内民族主义情绪长高位运行，限制了决策层的政策调整余地。</li>
+</ul>
+<h4>四、策略优化建议</h4>
+<ul>
+<li><span class="report-advise-tag">东盟分化与稳固双边渠道</span>主动接触中立和友好国家，减少菲律宾的外交动员成功率。</li>
+<li><span class="report-advise-tag">舆论主动态势塑造</span>布局国际叙事，削弱“霸凌者”标签，通过透明信息和法律依据遏制克制形象。</li>
+<li><span class="report-advise-tag">渐进性姿态管理</span>根据局势阶段，适度释放降温动作（如放行非敏感民用补给），营造谈判窗口。</li>
+</ul>
+</div>
+</div>
+<!-- 附件下载及打分 -->
+<div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px;">
+<div class="kb-item primary" style="width: max-content; margin:0;" onclick="window.location.href='report.html'">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+<span style="font-weight: bold;">Round_0_初始评估报告.pdf</span>
+</div>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748B;">
+<span>报告评分：</span>
+<div class="star-rating" style="display: flex; gap: 2px;">
+<span class="active">★</span>
+<span class="active">★</span>
+<span class="active">★</span>
+<span class="active">★</span>
+<span>★</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- 收起后的暗示区域（动态显示） -->
+<div class="chat-flow-hint" id="chat-flow-collapsed-hint" onclick="toggleChatFlow()">
+<svg class="icon icon-lg" style="color: #94A3B8;" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"></polyline></svg>
+<div>总览模块已收起，点击此处恢复展开</div>
+</div>
+
+<!-- 底部系统操作台 -->
+<div class="unified-control-module">
+<div class="system-progress-wrapper" id="progress-bar-wrapper" style="display: none;">
+<div class="progress-track" title="推演当前进度：50%">
+<div class="progress-line-fill" style="width: 50%;"></div>
+</div>
+</div>
+<div class="control-row">
+<div class="status-text">
+<span class="status-badge">系统状态</span>
+<span id="system-status-text">[Round 0] -- 初始态势已加载完毕，等待干预或指令进行下轮演进。</span>
+</div>
+<div class="control-btn-group">
+<button class="control-btn disabled" title="回退" disabled>
+<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+</button>
+<button class="control-btn disabled" id="btn-pause" title="暂停/编辑" disabled>
+<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+</button>
+<button class="control-btn operable" title="演进执行" onclick="alert('执行演进至 Round 1')">
+<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+</button>
+</div>
+</div>
+<div class="nl-input">
+<input type="text" placeholder="请描述本次推演需要应对的核心战略挑战、危机情景或需要评估的重大决策” ...">
+<button class="send-btn" title="发送指令">
+<svg class="icon icon-sm" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+</button>
+</div>
+</div>
+</div>
+<div class="resizer" id="dragRight"></div>
+<button class="expand-tab-right panel-btn" onclick="toggleRightSidebar()" title="展开面板">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+</button>
+<!-- ================= 右侧面板 ================= -->
+<div class="ws-right" id="ws-right">
+<div class="tabs" style="padding: 12px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #E2E8F0;">
+<button class="panel-btn right-sidebar-collapse" onclick="toggleRightSidebar()" title="收起面板" style="position: static; padding: 4px; margin: 0;">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="15" y1="3" x2="15" y2="21"></line></svg>
+</button>
+<div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: bold; color: #1E293B;">
+<svg class="icon icon-sm" style="color: #1E293B;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+态势与干预
+</div>
+</div>
+<div class="right-content" id="tab-env">
+<!-- ================= 智能体画像面板 ================= -->
+<div id="panel-agent" style="display: none;">
+<div class="card" style="border: 1px solid var(--primary-blue); box-shadow: 0 4px 16px rgba(26, 115, 232, 0.08); padding: 16px; position: relative; overflow: hidden;">
+<!-- 右上角关闭按钮 -->
+<span style="position: absolute; right: 16px; top: 16px; font-size:18px; color:#94A3B8; cursor:pointer; z-index: 10;" onclick="closeAgent()">×</span>
+<!-- 头部区域：头像与名字 -->
+<div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+<div style="width: 44px; height: 44px; background: #F1F5F9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #94A3B8;">
+<svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+</div>
+<div>
+<div style="font-size: 15px; font-weight: bold; color: #1E293B;">小费迪南德·马克斯</div>
+<div style="font-size: 11px; color: #64748B;">菲律宾总统</div>
+</div>
+</div>
+<!-- === 视图A：默认画像页 === -->
+<div id="agent-detail-view">
+<div style="display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap;">
+<span class="agent-detail-tag">关键决策人</span>
+<span class="agent-detail-tag">亲美倾向</span>
+<span class="agent-detail-tag">istj</span>
+<span class="agent-detail-tag dashed">+ 标签</span>
+</div>
+<div style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+<div style="font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 16px;">核心认知指标</div>
+<div style="display: flex; align-items: center; margin-bottom: 16px;">
+<div style="width: 64px; flex-shrink: 0;">
+<span style="background: #64748B; color: #FFFFFF; padding: 2px 6px; border-radius: 4px; font-size: 10px;">决策风格</span>
+</div>
+<div style="width: 70px; font-size: 12px; color: #1E293B; margin-left: 8px;">战略平衡型</div>
+<div style="flex: 1; height: 4px; background: #E2E8F0; border-radius: 2px; position: relative; margin-left: 12px;">
+<div style="position: absolute; left: 0; top: 0; height: 100%; width: 80%; background: var(--primary-blue); border-radius: 2px;"></div>
+<div style="position: absolute; left: 80%; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: var(--primary-blue); border-radius: 50%;"></div>
+</div>
+</div>
+<div style="display: flex; align-items: center; margin-bottom: 24px;">
+<div style="width: 64px; flex-shrink: 0; font-size: 12px; color: #1E293B;">对华态度</div>
+<div style="width: 70px; font-size: 12px; color: var(--primary-blue); font-weight: bold; margin-left: 8px;">25/100</div>
+<div style="flex: 1; height: 4px; background: #E2E8F0; border-radius: 2px; position: relative; margin-left: 12px;">
+<div style="position: absolute; left: 0; top: 0; height: 100%; width: 25%; background: var(--primary-blue); border-radius: 2px;"></div>
+<div style="position: absolute; left: 25%; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: var(--primary-blue); border-radius: 50%;"></div>
+</div>
+</div>
+<div style="display: flex; justify-content: space-around; text-align: center;">
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+<div style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--primary-blue); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #FFFFFF;">
+<div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 45%; background: var(--primary-blue-light);"></div>
+<span style="position: relative; z-index: 10; font-size: 12px; font-weight: bold; color: var(--primary-blue);">45%</span>
+</div>
+<span style="font-size: 10px; color: #64748B;">国内支持率</span>
+</div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+<div style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--primary-blue); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #FFFFFF;">
+<div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 35%; background: var(--primary-blue-light);"></div>
+<span style="position: relative; z-index: 10; font-size: 12px; font-weight: bold; color: var(--primary-blue);">35%</span>
+</div>
+<span style="font-size: 10px; color: #64748B;">美国关系</span>
+</div>
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+<div style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--primary-blue); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #FFFFFF;">
+<div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 20%; background: var(--primary-blue-light);"></div>
+<span style="position: relative; z-index: 10; font-size: 12px; font-weight: bold; color: var(--primary-blue);">20%</span>
+</div>
+<span style="font-size: 10px; color: #64748B;">经济发展</span>
+</div>
+</div>
+</div>
+<div style="margin-bottom: 20px;">
+<div style="font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 12px;">主要行动集/战法集</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px;">
+<span class="agent-detail-tag">发布强硬声明</span>
+<span class="agent-detail-tag">请求美军支援</span>
+<span class="agent-detail-tag">召开内阁会议</span>
+<span class="agent-detail-tag">向国际仲裁庭申诉</span>
+<span class="agent-detail-tag">发动舆论战</span>
+<span class="agent-detail-tag dashed">+ 行动</span>
+</div>
+</div>
+<div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+<div style="font-size: 13px; font-weight: bold; color: #1E293B;">决策风格</div>
+</div>
+<div style="font-size: 12px; color: #475569; line-height: 1.6; margin-bottom: 8px;">
+呈现出 <span style="font-weight:bold; color: #1E293B;">多层次、务实与战略平衡</span> 的特征。
+</div>
+<ul style="font-size: 12px; color: #475569; padding-left: 16px; line-height: 1.6; margin: 0;">
+<li style="margin-bottom: 4px;"><span style="font-weight:bold; color: #1E293B;">多维叙事：</span>在国际场合同强调国际法、主权、历史、人权、民主，灵活切换论述框架。</li>
+<li style="margin-bottom: 4px;"><span style="font-weight:bold; color: #1E293B;">战略平衡：</span>兼顾国内政治动员与国际战略，既利用南海问题争取盟友支持，又为国内执政合法性加分。</li>
+</ul>
+</div>
+<div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+<button onclick="showAgentCode()" style="font-size: 12px; padding: 4px 12px; border: 1px solid #CBD5E1; border-radius: 16px; background: #FFFFFF; color: #475569; cursor: pointer; transition: 0.2s;">决策建模</button>
+</div>
+</div>
+<!-- === 视图B：决策建模代码识别结果页 === -->
+<div id="agent-code-view" style="display: none;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-top: 4px;">
+<span style="font-weight: bold; font-size: 13px; color: #1E293B;">### 决策建模代码识别结果</span>
+<button onclick="showAgentDetail()" style="font-size: 12px; padding: 4px 12px; border: 1px solid #CBD5E1; border-radius: 16px; background: #FFFFFF; color: #475569; cursor: pointer; transition: 0.2s;">返回详情</button>
+</div>
+<div class="code-block">
+<div class="c-comment">#!/usr/bin/env python3</div>
+<div class="c-comment"># -*- coding: utf-8 -*-</div>
+<div class="c-comment">"""<br>小马科斯南海"强行运补"理性决策模型<br>基于权力竞争论、冒险主义倾向和地缘政治博弈的量化决策系统<br>"""</div><br>
+<span class="c-keyword">import</span> datetime<br>
+<span class="c-keyword">from</span> typing <span class="c-keyword">import</span> Dict, Tuple, List<br>
+<span class="c-keyword">import</span> time<br><br>
+<span class="c-keyword">class</span> <span class="c-class">MarcosDecisionModel</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-comment">"""小马科斯南海决策模型类"""</span><br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-keyword">def</span> <span class="c-class">__init__</span>(self):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-comment"># ========== 环境变量初始化（0-100分制）==========</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-comment"># 国内政治环境</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.国内民族主义情绪 = <span class="c-number">75</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.马科斯家族政治遗产压力 = <span class="c-number">70</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.国内政治支持率 = <span class="c-number">65</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.反对派批评强度 = <span class="c-number">60</span><br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-comment"># 国际环境</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.美国安全承诺强度 = <span class="c-number">85</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.中国反制决心指数 = <span class="c-number">90</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.东盟团结度 = <span class="c-number">45</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.国际舆论支持度 = <span class="c-number">55</span><br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-comment"># 军事与行动</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.菲律宾军事准备度 = <span class="c-number">40</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.美菲联合军演频率 = <span class="c-number">80</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.仁爱礁驻军生存压力 = <span class="c-number">95</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.中国海警现场力量 = <span class="c-number">85</span><br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-comment"># ========== 决策阈值 ==========</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.阈值_强行运补触发 = <span class="c-number">70</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.阈值_美国军事介入预期 = <span class="c-number">75</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.阈值_中国武力反制预期 = <span class="c-number">80</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.阈值_国内政治安全线 = <span class="c-number">50</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.阈值_东盟外交支持 = <span class="c-number">60</span><br><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="c-comment"># 历史记录</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.决策历史 = []
+</div>
+</div>
+</div>
+</div>
+<!-- 环境控制面板 -->
+<div class="card" id="panel-media">
+<div class="card-title">
+<span class="card-title-text"><svg class="icon icon-sm" style="color:var(--primary-blue);" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2" ry="2"></rect><line x1="16" y1="8" x2="16" y2="8.01"></line><line x1="8" y1="8" x2="12" y2="8"></line><line x1="8" y1="12" x2="16" y2="12"></line><line x1="8" y1="16" x2="16" y2="16"></line></svg> 舆论与媒体分析</span>
+</div>
+<div style="font-size: 13px; margin-bottom: 8px; color: #000000; font-weight: bold;">▼ 媒体主流情感倾向</div>
+<ul style="font-size: 13px; color: #475569; padding-left: 16px; margin-bottom: 12px; line-height: 1.6;">
+<li>亲政府派 45% (强硬维权)</li>
+<li>温和中立派 30% (呼吁对话)</li>
+<li>亲美派 25% (寻求保护)</li>
+</ul>
+<!-- 带时间轴设计的典型报道分析块 -->
+<div id="report-toggle-btn" onclick="toggleReportAnalysis()" style="font-size: 13px; color: #1E293B; cursor: pointer; font-weight: bold; margin-bottom: 8px; transition: 0.2s;">▶ 典型报道分析</div>
+<div id="report-analysis-content" style="display: none; padding-left: 8px; margin-top: 8px;" class="timeline-container">
+<div class="timeline-item" style="border-left: 2px solid #E2E8F0; padding-left: 16px; padding-bottom: 16px; position: relative;">
+<div class="timeline-dot" style="position: absolute; left: -5px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary-blue);"></div>
+<div class="timeline-title" style="font-size: 13px; color: #1E293B; margin-bottom: 4px;">《每日问询者报》头版：China's water cannons: An act of war against Filipino fishermen</div>
+<div class="timeline-desc" style="font-size: 11px; color: #94A3B8; line-height: 1.6;">
+情感值：<span style="color:#EF4444; font-weight:600;">-0.85（强烈负面）</span> &nbsp;|&nbsp; 转评：124K &nbsp;|&nbsp; 评论倾向：91% 反华
+</div>
+</div>
+<div class="timeline-item" style="border-left: 2px solid #E2E8F0; padding-left: 16px; position: relative;">
+<div class="timeline-dot" style="position: absolute; left: -5px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--primary-blue);"></div>
+<div class="timeline-title" style="font-size: 13px; color: #1E293B; margin-bottom: 4px;">ABS-CBN 晚间新闻：专题 “被困坐军舰的英雄们”(15 分钟)</div>
+<div class="timeline-desc" style="font-size: 11px; color: #94A3B8; line-height: 1.6;">
+收视率：3.2M &nbsp;|&nbsp; 煽情指数：<span style="color:#EF4444; font-weight:600;">8.5/10</span> &nbsp;|&nbsp; 叙事框架：悲情英雄
+</div>
+</div>
+</div>
+</div>
+<!-- 关键影响因素 -->
+<div class="card">
+<div class="card-title">
+<span class="card-title-text"><svg class="icon icon-sm" style="color:var(--primary-blue);" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg> 关键影响因素</span>
+</div>
+<ul style="font-size: 13px; color: #475569; padding-left: 16px; margin-bottom: 12px; line-height: 1.6;">
+<li style="margin-bottom: 8px;"><span style="display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;" title="美国表态时机与力度：将直接影响菲方激进程度">美国表态时机与力度：将直接影响菲方激进程度</span></li>
+<li style="margin-bottom: 8px;"><span style="display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;" title="经济精英介入：如果经济损失扩大，可能出现降温声音">经济精英介入：如果经济损失扩大，可能出现降温声音</span></li>
+<li style="margin-bottom: 8px;"><span style="display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;" title="天主教会立场：教会呼吁克制可能产生缓和作用">天主教会立场：教会呼吁克制可能产生缓和作用</span></li>
+</ul>
+<!-- 推荐选项 -->
+<div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+<div class="recommend-item" title="外部势力介入: 美军驶入南海">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">外部势力介入: 美军驶入南海</span>
+</div>
+<div class="recommend-item" title="媒体情绪拉升: 国际媒体0.75">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">媒体情绪拉升: 国际媒体0.75</span>
+</div>
+</div>
+<!-- 自定义影响因素输入框 -->
+<div style="position: relative;">
+<svg class="icon icon-sm" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94A3B8;" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<input type="text" placeholder="自定义" style="width: 100%; padding: 8px 12px 8px 30px; border: 1px dashed #CBD5E1; border-radius: 20px; font-size: 12px; color: #1E293B; outline: none; background: #FAFAFB; transition: 0.2s;" onfocus="this.style.borderColor='var(--primary-blue)'; this.style.borderStyle='solid'; this.style.backgroundColor='#FFFFFF';" onblur="if(!this.value){this.style.borderColor='#CBD5E1'; this.style.borderStyle='dashed'; this.style.backgroundColor='#FAFAFB';}">
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+// ======= 全局状态变量 =======
+let currentRound = 0;
+let currentView = 'global';
+
+// ======= Chat Flow 整体展开与收起控制 =======
+function toggleChatFlow() {
+const chatFlow = document.getElementById('chat-flow');
+const toggleBtnIcon = document.getElementById('toggle-chat-flow-icon');
+const toggleBtn = document.getElementById('btn-toggle-chat-flow');
+const controlModule = document.querySelector('.unified-control-module');
+const hint = document.getElementById('chat-flow-collapsed-hint');
+
+if (chatFlow.style.display === 'none') {
+chatFlow.style.display = 'flex';
+toggleBtnIcon.style.transform = 'rotate(0deg)';
+controlModule.style.marginTop = '0';
+toggleBtn.title = '收起总览模块';
+if(hint) hint.style.display = 'none';
+} else {
+chatFlow.style.display = 'none';
+toggleBtnIcon.style.transform = 'rotate(180deg)';
+controlModule.style.marginTop = 'auto'; // 自适应推到底部
+toggleBtn.title = '展开总览模块';
+if(hint) hint.style.display = 'flex';
+}
+}
+
+// ======= 锚点滚动跳转 =======
+function scrollToCard(cardId) {
+const chatFlow = document.getElementById('chat-flow');
+if (chatFlow.style.display === 'none') {
+toggleChatFlow();
+}
+// 加入微小延时，确保 display: flex 渲染完成后再计算并执行滚动
+setTimeout(() => {
+const card = document.getElementById(cardId);
+if (card && card.style.display !== 'none') {
+card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+}, 50);
+}
+
+// ======= Round1/2非全局视角卡片折叠逻辑 =======
+function applyCardFoldingLogic() {
+if (currentRound === 1 || currentRound === 2) {
+const contentInteraction = document.getElementById('content-interaction');
+const contentReport = document.getElementById('content-report');
+const iconInteraction = document.getElementById('toggle-icon-interaction');
+const iconReport = document.getElementById('toggle-icon-report');
+
+if (currentView !== 'global') {
+// 非全局视角时自动折叠
+if(contentInteraction) contentInteraction.style.display = 'none';
+if(contentReport) contentReport.style.display = 'none';
+if(iconInteraction) {
+iconInteraction.style.display = 'block';
+iconInteraction.style.transform = 'rotate(0deg)';
+}
+if(iconReport) {
+iconReport.style.display = 'block';
+iconReport.style.transform = 'rotate(0deg)';
+}
+} else {
+// 全局视角时自动展开，并隐藏折叠箭头按钮
+if(contentInteraction) contentInteraction.style.display = 'block';
+if(contentReport) contentReport.style.display = 'block';
+if(iconInteraction) iconInteraction.style.display = 'none';
+if(iconReport) iconReport.style.display = 'none';
+}
+}
+}
+
+// 单个卡片的手动展开/收起切换
+function toggleFlowCard(cardId) {
+// 只有在支持折叠的情境下允许手动切换
+if ((currentRound === 1 || currentRound === 2) && currentView !== 'global') {
+const content = document.getElementById('content-' + cardId);
+const icon = document.getElementById('toggle-icon-' + cardId);
+if (content.style.display === 'none') {
+content.style.display = 'block';
+icon.style.transform = 'rotate(-180deg)';
+} else {
+content.style.display = 'none';
+icon.style.transform = 'rotate(0deg)';
+}
+}
+}
+
+// ======= 添加新分支功能 =======
+function addBranch(containerId, roundIndex) {
+const container = document.getElementById(containerId);
+const branchCount = container.querySelectorAll('.tree-node').length;
+const newBranchName = prompt("请输入新分支名称：", "分支" + String.fromCharCode(65 + branchCount) + ": 自定义新策略");
+if (newBranchName && newBranchName.trim() !== "") {
+const newBranch = document.createElement('div');
+newBranch.className = 'tree-node';
+const newId = 'nav-branch-' + Date.now();
+newBranch.id = newId;
+newBranch.innerText = newBranchName;
+newBranch.onclick = function() { switchRound(roundIndex, newId); };
+container.appendChild(newBranch);
+}
+}
+
+// ======= 推演分支导航切换 =======
+function switchRound(roundIndex, targetId) {
+currentRound = roundIndex;
+// 移除所有节点的 active 状态
+document.querySelectorAll('.panel-section .tree-node').forEach(node => {
+node.classList.remove('active');
+});
+
+// 给选中的节点附加 active 状态
+if (targetId) {
+const targetEl = document.getElementById(targetId);
+if(targetEl) targetEl.classList.add('active');
+} else {
+const defaultEl = document.getElementById('nav-round' + roundIndex);
+if(defaultEl) defaultEl.classList.add('active');
+}
+
+const cardInteraction = document.getElementById('card-interaction');
+const cardDecision = document.getElementById('card-decision');
+const cardReport = document.getElementById('card-report');
+// 获取进度条、系统状态、智能体总览、暂停按钮 DOM 节点
+const progressBar = document.getElementById('progress-bar-wrapper');
+const systemStatus = document.getElementById('system-status-text');
+const cardAgentOverview = document.getElementById('card-agent-overview');
+const btnPause = document.getElementById('btn-pause');
+
+// 快捷导航按钮控制
+const navIconInteraction = document.getElementById('nav-icon-interaction');
+const navIconDecision = document.getElementById('nav-icon-decision');
+const navIconReport = document.getElementById('nav-icon-report');
+
+if (roundIndex === 0) {
+// 隐藏特定卡片
+cardInteraction.style.display = 'none';
+cardDecision.style.display = 'none';
+cardReport.style.display = 'none';
+// 隐藏对应锚点快捷图标并重置 order
+if(navIconInteraction) {
+navIconInteraction.style.display = 'none';
+navIconInteraction.style.order = '0';
+}
+if(navIconDecision) navIconDecision.style.display = 'none';
+if(navIconReport) navIconReport.style.display = 'none';
+
+// Round 0 下隐藏进度条、恢复状态文案、显示智能体总览
+progressBar.style.display = 'none';
+systemStatus.innerText = '[Round 0] -- 初始态势已加载完毕，等待干预或指令进行下轮演进。';
+cardAgentOverview.style.display = 'block';
+// 禁用暂停按钮
+btnPause.className = 'control-btn disabled';
+btnPause.disabled = true;
+// 恢复全景交互细节默认排序
+cardInteraction.style.order = '0';
+cardAgentOverview.style.order = '0';
+} else if (roundIndex === 1 || roundIndex === 2) {
+// 恢复特定卡片
+cardInteraction.style.display = 'block';
+cardDecision.style.display = 'block';
+cardReport.style.display = 'block';
+// 恢复对应锚点快捷图标，并将“全景交互”设为排位第一
+if(navIconInteraction) {
+navIconInteraction.style.display = 'flex';
+navIconInteraction.style.order = '-1';
+}
+if(navIconDecision) navIconDecision.style.display = 'flex';
+if(navIconReport) navIconReport.style.display = 'flex';
+
+// 保留(显示)进度条、更新状态文案
+progressBar.style.display = 'flex';
+if (roundIndex === 1) {
+systemStatus.innerText = '[Round 1]：触发事件 —— 菲运补船强行运补仁爱礁';
+} else {
+systemStatus.innerText = '[Round 2]：触发事件 —— 菲运补船强行运补仁爱礁';
+}
+
+// 启用暂停按钮
+btnPause.className = 'control-btn operable';
+btnPause.disabled = false;
+// 保证智能体总览展示并调整层级排序：全景交互排最前（-2），智能体总览排第二（-1）
+cardAgentOverview.style.display = 'block';
+cardInteraction.style.order = '-2';
+cardAgentOverview.style.order = '-1';
+}
+
+applyCardFoldingLogic();
+}
+
+// ======= 典型报道分析折叠/展开逻辑 =======
+function toggleReportAnalysis() {
+const content = document.getElementById('report-analysis-content');
+const btn = document.getElementById('report-toggle-btn');
+if (content.style.display === 'none') {
+content.style.display = 'block';
+btn.innerHTML = '▼ 典型报道分析';
+} else {
+content.style.display = 'none';
+btn.innerHTML = '▶ 典型报道分析';
+}
+}
+// ======= 智能体详情与代码视图切换 =======
+function showAgentCode() {
+document.getElementById('agent-detail-view').style.display = 'none';
+document.getElementById('agent-code-view').style.display = 'block';
+}
+function showAgentDetail() {
+document.getElementById('agent-code-view').style.display = 'none';
+document.getElementById('agent-detail-view').style.display = 'block';
+}
+
+// 态势总览4项指标动态数据映射
+const metricData = {
+global: {
+v1: '74% <span class="metric-trend trend-down">↓</span>', c1: 'metric-val red', d1: '军事动作趋稳，接触风险下降。',
+v2: '66% <span class="metric-trend trend-down">↓</span>', c2: 'metric-val yellow', d2: '东盟磋商获得部分缓和空间。',
+v3: '强硬 <span class="metric-trend trend-up">↑</span>', c3: 'metric-val red', d3: '避免战争舆论增加，但核心立场依旧强硬。',
+v4: '83% <span class="metric-trend trend-down">↓</span>', c4: 'metric-val red', d4: '缺少新冲突画面，情绪略降仍高位运行。'
+},
+cn: {
+v1: '52% <span class="metric-trend trend-down">↓</span>', c1: 'metric-val yellow', d1: '海警现场管控有效，驱离非必要摩擦。',
+v2: '45% <span class="metric-trend trend-down">↓</span>', c2: 'metric-val yellow', d2: '掌握外交主动，东盟内部倾向中立。',
+v3: '极稳 <span class="metric-trend trend-up">↑</span>', c3: 'metric-val red', d3: '国内民众对海警维权行动高度支持。',
+v4: '12% <span class="metric-trend trend-down">↓</span>', c4: 'metric-val yellow', d4: '国内情绪稳定，主张坚决捍卫主权。'
+},
+ph: {
+v1: '88% <span class="metric-trend trend-up">↑</span>', c1: 'metric-val red', d1: '前线补给受阻，军方主张强硬应对。',
+v2: '85% <span class="metric-trend trend-up">↑</span>', c2: 'metric-val red', d2: '寻求国际仲裁和外部势力干预遇阻。',
+v3: '激进 <span class="metric-trend trend-up">↑</span>', c3: 'metric-val red', d3: '民族主义情绪高涨，要求政府采取行动。',
+v4: '92% <span class="metric-trend trend-up">↑</span>', c4: 'metric-val red', d4: '媒体炒作水炮事件，对华敌意升温。'
+},
+us: {
+v1: '78% <span class="metric-trend trend-up">↑</span>', c1: 'metric-val red', d1: '印太司令部提升戒备，航母编队游弋。',
+v2: '55% <span class="metric-trend trend-up">↑</span>', c2: 'metric-val yellow', d2: '协调盟友发表联合声明，施压中方。',
+v3: '关注 <span class="metric-trend trend-up">↑</span>', c3: 'metric-val yellow', d3: '两党对南海局势保持高度警惕。',
+v4: '68% <span class="metric-trend trend-down">↓</span>', c4: 'metric-val yellow', d4: '智库与媒体聚焦大国竞争，情绪固化。'
+}
+};
+
+// ======= 视角切换交互 =======
+function changeView(view) {
+currentView = view;
+
+// 1. 智能体视图联动：仅展示对应智能体且控制(共9个)字眼
+const agentRows = document.querySelectorAll('.agent-row');
+const agentCountText = document.getElementById('agent-overview-count');
+
+agentRows.forEach(row => {
+if (view === 'global') {
+row.style.display = 'flex';
+row.style.opacity = '1'; 
+} else {
+const nation = row.getAttribute('data-nation');
+if (nation === view) {
+row.style.display = 'flex';
+row.style.opacity = '1';
+} else {
+row.style.display = 'none';
+}
+}
+});
+
+if (view === 'global') {
+if(agentCountText) agentCountText.style.display = 'inline';
+} else {
+if(agentCountText) agentCountText.style.display = 'none';
+}
+
+// 2. 本轮国家最终决策过滤联动逻辑
+const decisionRows = document.querySelectorAll('.decision-row');
+decisionRows.forEach(row => {
+if (view === 'global') {
+row.style.display = 'block';
+} else {
+const nation = row.getAttribute('data-nation');
+if (nation === view) {
+row.style.display = 'block';
+} else {
+row.style.display = 'none';
+}
+}
+});
+
+// 3. 根据不同视角动态刷新态势总览指标
+const globalViewEl = document.getElementById('dashboard-global-view');
+const singleViewEl = document.getElementById('dashboard-single-view');
+
+if (view === 'global') {
+globalViewEl.style.display = 'block';
+singleViewEl.style.display = 'none';
+} else {
+globalViewEl.style.display = 'none';
+singleViewEl.style.display = 'block';
+const data = metricData[view];
+if(data) {
+const m1 = document.getElementById('metric-val-1');
+const d1 = document.getElementById('metric-desc-1');
+m1.innerHTML = data.v1; m1.className = data.c1; d1.innerText = data.d1;
+const m2 = document.getElementById('metric-val-2');
+const d2 = document.getElementById('metric-desc-2');
+m2.innerHTML = data.v2; m2.className = data.c2; d2.innerText = data.d2;
+const m3 = document.getElementById('metric-val-3');
+const d3 = document.getElementById('metric-desc-3');
+m3.innerHTML = data.v3; m3.className = data.c3; d3.innerText = data.d3;
+const m4 = document.getElementById('metric-val-4');
+const d4 = document.getElementById('metric-desc-4');
+m4.innerHTML = data.v4; m4.className = data.c4; d4.innerText = data.d4;
+}
+}
+
+// 4. 执行状态折叠检查
+applyCardFoldingLogic();
+}
+
+// ======= 左侧边栏折叠/展开 =======
+function toggleLeftSidebar() {
+document.body.classList.toggle('left-collapsed');
+}
+// ======= 右侧面板展开与切换 =======
+function toggleRightSidebar() {
+document.body.classList.toggle('right-collapsed');
+}
+// 兼容去除了 .tab 样式后的防报错逻辑
+function switchTab(tabId, el) {
+document.getElementById('tab-env').style.display = 'none';
+document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+if(document.getElementById(tabId)){
+document.getElementById(tabId).style.display = 'flex';
+}
+if(el) el.classList.add('active');
+}
+function openRightEnv() {
+if(document.body.classList.contains('right-collapsed')) {
+document.body.classList.remove('right-collapsed');
+}
+document.getElementById('tab-env').style.display = 'flex';
+}
+
+// ======= 智能体快捷交互 =======
+function selectAgent() {
+const node = document.getElementById('ph-node');
+if (node.classList.contains('selected')) {
+closeAgent();
+} else {
+document.querySelectorAll('.agent-tag').forEach(t => t.classList.remove('selected'));
+node.classList.add('selected');
+if(document.body.classList.contains('right-collapsed')) {
+document.body.classList.remove('right-collapsed');
+}
+document.getElementById('tab-env').style.display = 'flex';
+// 恢复展示卡片
+document.getElementById('panel-media').style.display = 'block';
+document.querySelectorAll('.card').forEach(c => c.style.display = 'block');
+// 每次打开面板时，默认重置为画像视图
+showAgentDetail();
+document.getElementById('panel-agent').style.display = 'block';
+document.getElementById('tab-env').scrollTo({top: 0, behavior: 'smooth'});
+}
+}
+function closeAgent() {
+document.querySelectorAll('.agent-tag').forEach(t => t.classList.remove('selected'));
+document.getElementById('panel-agent').style.display = 'none';
+}
+
+// ======= 星级打分逻辑 =======
+document.querySelectorAll('.star-rating span').forEach((star, index, stars) => {
+star.addEventListener('click', () => {
+stars.forEach((s, i) => {
+if(i <= index) s.classList.add('active');
+else s.classList.remove('active');
+});
+});
+});
+
+// ======= 拖拽左右边栏控制逻辑 =======
+const dragLeft = document.getElementById('dragLeft');
+const dragRight = document.getElementById('dragRight');
+const wsLeft = document.getElementById('ws-left');
+const wsRight = document.getElementById('ws-right');
+let isResizingLeft = false;
+let isResizingRight = false;
+dragLeft.addEventListener('mousedown', (e) => {
+isResizingLeft = true;
+document.body.style.cursor = 'col-resize';
+document.body.style.userSelect = 'none';
+dragLeft.classList.add('dragging');
+wsLeft.style.transition = 'none';
+});
+dragRight.addEventListener('mousedown', (e) => {
+isResizingRight = true;
+document.body.style.cursor = 'col-resize';
+document.body.style.userSelect = 'none';
+dragRight.classList.add('dragging');
+wsRight.style.transition = 'none';
+});
+document.addEventListener('mousemove', (e) => {
+if (!isResizingLeft && !isResizingRight) return;
+if (isResizingLeft) {
+const toolbarWidth = document.getElementById('toolbar').offsetWidth;
+let newWidth = e.clientX - toolbarWidth;
+if (newWidth >= 200 && newWidth <= 400) {
+wsLeft.style.width = newWidth + 'px';
+}
+}
+if (isResizingRight) {
+let newWidth = document.body.clientWidth - e.clientX;
+if (newWidth >= 280 && newWidth <= 550) {
+wsRight.style.width = newWidth + 'px';
+}
+}
+});
+document.addEventListener('mouseup', () => {
+if(isResizingLeft || isResizingRight) {
+isResizingLeft = false;
+isResizingRight = false;
+document.body.style.cursor = 'default';
+document.body.style.userSelect = 'auto';
+dragLeft.classList.remove('dragging');
+dragRight.classList.remove('dragging');
+wsLeft.style.transition = 'width 0.3s ease';
+wsRight.style.transition = 'width 0.3s ease';
+}
+});
+
+// ======= 全局工具栏展开/收起核心逻辑 =======
+function toggleToolbar() {
+const tb = document.getElementById('toolbar');
+const toggleBtn = document.getElementById('sidebar-toggle-btn');
+tb.classList.toggle('expanded');
+if (tb.classList.contains('expanded')) {
+toggleBtn.title = "收起边栏";
+} else {
+toggleBtn.title = "展开边栏";
+}
+}
+
+// ======= 历史任务列表展开/收起逻辑 =======
+function toggleHistoryList() {
+const list = document.getElementById('history-list-container');
+const arrow = document.getElementById('history-arrow');
+if (list.style.display === 'none') {
+list.style.display = 'flex';
+arrow.classList.remove('collapsed');
+} else {
+list.style.display = 'none';
+arrow.classList.add('collapsed');
+}
+}
+</script>
+</body>
+</html>

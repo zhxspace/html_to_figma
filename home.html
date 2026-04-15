@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>首页 - DecisionOne</title>
+<style>
+/* 全局变量与重置 */
+:root { --primary-blue: #1A73E8; --primary-blue-light: #E8F0FE; --primary-black: #1E293B; }
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+body { background: #F8FAFC; height: 100vh; display: flex; color: #1E293B; overflow: hidden; -webkit-font-smoothing: antialiased; }
+
+/* SVG 线性图标通用规范 */
+.icon { width: 16px; height: 16px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-sm { width: 14px; height: 14px; }
+.icon-lg { width: 22px; height: 22px; }
+
+/* ================= 侧边栏重构 (Manus 风格) ================= */
+.global-toolbar {
+width: 68px;    /* 收起时的宽度 */
+background: #FFFFFF;    /* Manus风格偏好极简纯白侧边栏 */
+border-right: 1px solid #E2E8F0;
+display: flex;
+flex-direction: column;
+transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+overflow-x: hidden;
+overflow-y: hidden;
+white-space: nowrap;
+z-index: 100;
+flex-shrink: 0;
+}
+.global-toolbar.expanded {
+width: 260px;    /* 展开时的宽度 */
+}
+.global-toolbar:hover {
+overflow-y: auto;
+}
+.global-toolbar::-webkit-scrollbar { width: 4px; }
+.global-toolbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 2px; }
+
+/* 侧边栏头部：Logo + 展开收起控制器 */
+.tb-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+height: 64px;
+padding: 0 16px;
+margin-bottom: 8px;
+position: relative;    /* 为收起时的绝对定位做准备 */
+}
+.global-toolbar:not(.expanded) .tb-header {
+justify-content: center;
+}
+.tb-logo-box {
+display: flex;
+align-items: center;
+gap: 10px;
+color: var(--primary-black);
+font-weight: 700;
+font-size: 16px;
+text-decoration: none;
+transition: opacity 0.2s;
+}
+/* 收起边栏时的 Logo 与图标显隐悬浮逻辑 */
+.global-toolbar:not(.expanded) .tb-logo-box span {
+display: none;    /* 收起时仅隐藏文字，保留黑色的Logo图标 */
+}
+.global-toolbar:not(.expanded) .tb-logo-box {
+justify-content: center;
+width: 100%;
+}
+.global-toolbar:not(.expanded) .sidebar-toggle {
+position: absolute;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+opacity: 0;
+pointer-events: none;
+}
+/* 鼠标悬停tb-header时的动态切换 */
+.global-toolbar:not(.expanded) .tb-header:hover .tb-logo-box {
+opacity: 0;
+}
+.global-toolbar:not(.expanded) .tb-header:hover .sidebar-toggle {
+opacity: 1;
+pointer-events: auto;
+background: #F1F5F9;
+}
+/* Manus 同款展开收起 icon 按钮 */
+.sidebar-toggle {
+background: transparent;
+border: none;
+cursor: pointer;
+color: #64748B;
+padding: 6px;
+border-radius: 6px;
+display: flex;
+align-items: center;
+justify-content: center;
+transition: 0.2s;
+outline: none;
+}
+.sidebar-toggle:hover {
+background: #F1F5F9;
+color: var(--primary-black);
+}
+
+/* 顶部主导航项 */
+.tb-nav {
+padding: 0 12px;
+margin-bottom: 24px;
+}
+.tb-item {
+display: flex;
+align-items: center;
+color: #1E293B;    /* 加深颜色，更黑更高级 */
+text-decoration: none;
+padding: 10px 12px;
+border-radius: 8px;
+margin-bottom: 4px;
+transition: 0.2s;
+font-weight: 500;
+cursor: pointer;
+font-size: 14px;
+}
+.global-toolbar:not(.expanded) .tb-item {
+justify-content: center;
+padding: 12px 0;
+}
+.tb-item:hover {
+background: #F1F5F9;
+}
+.tb-item.active {
+background: var(--primary-blue-light);
+color: var(--primary-blue);
+}
+.tb-item svg {
+flex-shrink: 0;
+}
+.global-toolbar.expanded .tb-item svg {
+margin-right: 12px;
+}
+.global-toolbar:not(.expanded) .tb-item span {
+display: none;
+}
+
+/* 收起态下的专属历史任务图标 */
+.collapsed-history-btn {
+display: none !important;
+}
+.global-toolbar:not(.expanded) .collapsed-history-btn {
+display: flex !important;
+}
+
+/* 历史模块 (Manus 层级风格) */
+.history-section {
+display: flex;
+flex-direction: column;
+padding: 0 12px;
+opacity: 1;
+transition: opacity 0.2s;
+}
+.global-toolbar:not(.expanded) .history-section {
+display: none;    /* 收起时隐藏整个历史模块 */
+}
+.history-header {
+font-size: 14px;
+color: #64748B;
+font-weight: 600;
+padding: 0 12px;
+margin-bottom: 12px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+}
+.history-arrow-icon {
+transition: transform 0.3s;
+}
+.history-arrow-icon.collapsed {
+transform: rotate(-90deg);
+}
+.history-search {
+display: flex;
+align-items: center;
+background: #F8FAFC;
+border: 1px solid transparent;
+border-radius: 8px;
+padding: 8px 12px;
+margin: 0 0 12px 0;
+gap: 8px;
+color: #64748B;
+transition: 0.2s;
+}
+.history-search:focus-within {
+border-color: #CBD5E1;
+background: #FFFFFF;
+box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+.history-search input {
+border: none;
+background: transparent;
+outline: none;
+width: 100%;
+font-size: 13px;
+color: #1E293B;
+}
+.history-list {
+display: flex;
+flex-direction: column;
+gap: 2px;
+}
+.hist-item {
+font-size: 14px;
+color: #1E293B;    /* 加深历史记录颜色 */
+padding: 10px 12px;
+border-radius: 8px;
+cursor: pointer;
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+transition: 0.2s;
+display: flex;
+align-items: center;
+gap: 8px;
+}
+.hist-item:hover {
+background: #F1F5F9;
+}
+
+/* ================= 底部用户信息区 ================= */
+.user-profile {
+margin-top: auto;
+padding: 16px;
+display: flex;
+align-items: center;
+gap: 12px;
+border-top: 1px solid #E2E8F0;
+cursor: pointer;
+transition: 0.2s;
+}
+.user-profile:hover {
+background: #F1F5F9;
+}
+.avatar {
+width: 32px;
+height: 32px;
+border-radius: 50%;
+background: var(--primary-black);
+color: #FFFFFF;
+display: flex;
+align-items: center;
+justify-content: center;
+font-weight: bold;
+flex-shrink: 0;
+font-size: 14px;
+}
+.user-name {
+font-size: 14px;
+font-weight: 500;
+color: #1E293B;
+white-space: nowrap;
+overflow: hidden;
+text-overflow: ellipsis;
+}
+.global-toolbar:not(.expanded) .user-profile {
+padding: 16px 0;
+justify-content: center;
+}
+.global-toolbar:not(.expanded) .user-name {
+display: none;
+}
+
+/* ================= 右侧内容主区域 ================= */
+.wrapper { flex: 1; display: flex; overflow: hidden; }
+/* 中间会话输入区 */
+.ws-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; background: #F8FAFC; position: relative; }
+.title { font-size: 28px; font-weight: 400; margin-bottom: 10px; color: #1E293B; }
+.mode-switch { font-size: 13px; color: #64748B; margin-bottom: 40px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 500;}
+.chat-box { width: 100%; max-width: 700px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); display: flex; flex-direction: column; }
+textarea { width: 100%; height: 80px; border: none; outline: none; resize: none; font-size: 15px; margin-bottom: 10px; color: #1E293B; background: transparent;}
+textarea::placeholder { color: #94A3B8; }
+.tools { display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #E2E8F0; padding-top: 12px; }
+.tool-group { display: flex; gap: 8px; }
+.tool-group span { font-size: 12px; color: #64748B; background: #F8FAFC; padding: 6px 12px; border-radius: 20px; cursor: pointer; border: 1px solid #E2E8F0; display: flex; align-items: center; gap: 6px; transition: 0.2s; font-weight: 500;}
+/* ==== 核心修改：按钮高亮状态使用黑白配色 ==== */
+.tool-group span.active { color: var(--primary-black); background: #F1F5F9; border-color: var(--primary-black); }
+.send-btn { background: var(--primary-black); color: #FFFFFF; border: none; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; outline: none;}
+.send-btn:hover { background: #334155; box-shadow: 0 4px 10px rgba(0,0,0,0.15);}
+/* 禁用状态发送按钮样式 */
+.send-btn:disabled { background: #CBD5E1; color: #FFFFFF; cursor: not-allowed; box-shadow: none; }
+.send-btn:disabled:hover { background: #CBD5E1; box-shadow: none; }
+
+/* ================= 弹窗通用基础账号管理样式 ================= */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+.modal-content { background: #FFFFFF; width: 400px; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+.modal-header { padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
+.modal-header h3 { font-size: 16px; margin: 0; font-weight: 600; color: var(--primary-black); }
+.close-btn { background: none; border: none; cursor: pointer; color: #64748B; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.close-btn:hover { background: #F1F5F9; color: var(--primary-black); }
+.modal-body { padding: 20px; }
+.info-row { display: flex; margin-bottom: 20px; font-size: 14px; align-items: center;}
+.info-row .label { color: #64748B; width: 80px; }
+.info-row .value { color: var(--primary-black); font-weight: 500; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; color: #64748B; margin-bottom: 6px; }
+.form-group input { width: 100%; padding: 8px 12px; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 14px; outline: none; transition: 0.2s; color: #1E293B; }
+.form-group input:focus { border-color: var(--primary-black); box-shadow: 0 0 0 2px #E2E8F0; }
+.form-group input:disabled { background: #F8FAFC; color: #94A3B8; cursor: not-allowed; border-color: #E2E8F0; }
+.pwd-input { position: relative; }
+.pwd-input button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #94A3B8; display: flex; align-items: center; padding: 4px;}
+.pwd-input button:hover { color: #64748B; }
+.error-msg { color: #EF4444; font-size: 12px; margin-top: 4px; min-height: 16px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 8px; }
+/* 按钮统一使用黑白配色 */
+.primary-btn { background: var(--primary-black); color: #FFFFFF; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+.primary-btn:hover { background: #334155; }
+.default-btn { background: #FFFFFF; color: var(--primary-black); border: 1px solid #E2E8F0; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+.default-btn:hover { background: #F8FAFC; }
+
+/* 隐藏各大浏览器、密码管理插件自带的自动填充小钥匙/图标 */
+input::-webkit-credentials-auto-fill-button { display: none !important; visibility: hidden !important; }
+input::-webkit-contacts-auto-fill-button { display: none !important; visibility: hidden !important; }
+input::-ms-reveal, input::-ms-clear { display: none !important; }
+
+/* 与 config.html 保持一致的深色圆角 Toast 样式，居中定位 */
+.toast-tip { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(30, 41, 59, 0.85); color: #FFFFFF; padding: 10px 24px; border-radius: 24px; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.3s ease-in-out; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.toast-tip.show { opacity: 1; }
+
+/* 文本操作按钮通用样式，去除了多余的固定宽度，仅占用文字原生空间，缩小间距防突兀 */
+.clickable-text { color: var(--primary-blue); font-size: 13px; cursor: pointer; transition: 0.2s; white-space: nowrap; font-weight: 500; }
+.clickable-text:hover { opacity: 0.8; }
+.inline-action-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 2; }
+
+/* ==== 知识库标签、附件上传区域规范样式及全局复选框配色 ==== */
+input[type="checkbox"] { accent-color: var(--primary-black); cursor: pointer; }
+.upload-area { border: 2px dashed #CBD5E1; border-radius: 8px; padding: 40px 20px; text-align: center; color: #64748B; cursor: pointer; transition: 0.2s; background: #F8FAFC; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.upload-area:hover { border-color: var(--primary-black); background: #F1F5F9; color: var(--primary-black); }
+.folder-tag { font-size: 11px; padding: 3px 10px; border-radius: 6px; font-weight: 500;}
+.tag-general { background: var(--primary-blue-light); color: var(--primary-blue); }
+.tag-law { background: #E6F4EA; color: #137333; }
+.tag-politics { background: #F3E8FD; color: #7E22CE; }
+.tag-economy { background: #FFEDD5; color: #C2410C; }
+.source-folder { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+.source-folder-header { font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; font-size: 14px; color: #1E293B; gap: 8px;}
+.source-doc-list { display: flex; flex-direction: column; gap: 6px; margin-left: 24px; }
+.source-doc-item { font-size: 13px; color: #475569; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- 侧边栏：默认自带 expanded 类，呈现展开状态 -->
+<div class="global-toolbar expanded" id="toolbar">
+<!-- 侧边栏头部区域 -->
+<div class="tb-header">
+<a href="home.html" class="tb-logo-box" title="DecisionOne 首页">
+<!-- 替换后的线框形态 D1 Logo 图标 -->
+<svg class="icon icon-lg" style="color:var(--primary-black);" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 18C4.686 18 2 15.314 2 12c0-3.314 2.686-6 6-6 2.5 0 4.8 1.5 5.5 3.5" />
+<path d="M16 6c3.314 0 6 2.686 6 6 0 3.314-2.686 6-6 6-2.5 0-4.8-1.5-5.5-3.5" />
+</svg>
+<span>DecisionOne</span>
+</a>
+<!-- Manus 同款侧边栏控制器 (动态文案由JS控制) -->
+<button id="sidebar-toggle-btn" class="sidebar-toggle" onclick="toggleToolbar()" title="收起边栏">
+<svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+</button>
+</div>
+<!-- 顶部主导航区 -->
+<div class="tb-nav">
+<!-- 1. 新建任务 (已去除了 active 类，保持非选中态) -->
+<a href="home.html" class="tb-item">
+<svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+<span>新建任务</span>
+</a>
+<!-- 2. 知识库 -->
+<a href="knowledge.html" class="tb-item">
+<svg class="icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+<span>知识库</span>
+</a>
+<!-- 3. 专门针对收起态的历史任务图标 -->
+<div class="tb-item collapsed-history-btn" onclick="toggleToolbar()" title="历史任务">
+<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+</div>
+</div>
+<!-- 历史模块区 (Manus 层级结构) -->
+<div class="history-section">
+<div class="history-header">
+<div style="display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="toggleHistoryList()">
+<span>历史任务</span>
+<svg id="history-arrow" class="icon icon-sm history-arrow-icon" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+<svg class="icon icon-sm" style="cursor: pointer;" viewBox="0 0 24 24" onclick="toggleHistorySearch()"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+</div>
+<!-- 历史搜索输入框 -->
+<div class="history-search" id="history-search-box" style="display: none;">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+<input type="text" placeholder="搜索历史任务...">
+</div>
+<!-- 历史记录列表 -->
+<div class="history-list" id="history-list-container">
+<div class="hist-item" onclick="window.location.href='workspace.html'">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+菲律宾仁爱礁强行运补事件推演
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+关税后续问题推演评估及应对
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+中东原油市场短期走势预测分析
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+东海防空识别区常态化巡航评估
+</div>
+<div class="hist-item">
+<svg class="icon icon-sm" style="color: #94A3B8;" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+半导体供应链制裁极限施压演进
+</div>
+</div>
+</div>
+<!-- 底部用户信息区 -->
+<div class="user-profile" onclick="openAccountModal()">
+<div class="avatar">A</div>
+<div class="user-name">admin</div>
+</div>
+</div>
+<!-- 右侧主内容区 -->
+<div class="wrapper">
+<div class="ws-center">
+<div class="title">决策推演，未卜先知！</div>
+<div class="mode-switch">
+标准模式
+<svg class="icon icon-sm" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+</div>
+<div class="chat-box">
+<textarea id="chatInput" placeholder="输入需推演的情景，例如：菲律宾仁爱礁强行运补对局势有何影响？"></textarea>
+<div class="tools">
+<div class="tool-group">
+<!-- 使用<em>替代<span>标签实现文案控制，完全避免污染原本的 CSS 样式 -->
+<span onclick="openUploadModal()"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg> 附件</span>
+<span onclick="toggleNetwork(this)"><svg class="icon icon-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path></svg> <em class="net-text" style="font-style: normal;">未启用联网</em></span>
+<!-- 设置信源按钮加上了 id="sourceBtn" 用于和勾选状态联动 -->
+<span id="sourceBtn" onclick="openSourceModal()"><svg class="icon icon-sm" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg> 设置信源</span>
+</div>
+<!-- 默认置灰，通过JS控制属性与状态 -->
+<button id="sendBtn" class="send-btn" disabled>
+<svg class="icon icon-sm" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+</button>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ================= 账号管理弹窗 ================= -->
+<div class="modal-overlay" id="accountModal">
+<!-- 将弹窗容器设置相对定位，为了内部 Toast 的居中绝对定位 -->
+<div class="modal-content" style="position: relative;">
+<div class="modal-header">
+<h3>账号管理</h3>
+<button class="close-btn" onclick="closeAccountModal()">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+</button>
+</div>
+<div class="modal-body">
+<!-- 提示信息 (样式完全复刻 config 的 toast，并且居中显示) -->
+<div id="toastMessage" class="toast-tip"></div>
+<!-- 基础态：可直接输入编辑的用户名，及点击文字修改密码 -->
+<div id="viewState">
+<div class="form-group">
+<label>用户名</label>
+<div style="position: relative;">
+<!-- 缩小 padding 预留，并添加属性阻止插件注入强制出现钥匙图标 -->
+<input type="text" id="editUsername" value="admin" autocomplete="off" data-lpignore="true" data-1p-ignore="true" spellcheck="false" oninput="handleUsernameInput()" onkeypress="handleUsernameKey(event)" style="padding-right: 48px;">
+<span id="saveUsernameBtn" class="clickable-text inline-action-btn" onclick="saveUsername()" style="display: none;">保存</span>
+</div>
+<div class="error-msg" id="usernameError"></div>
+</div>
+<div class="form-group">
+<label>密码</label>
+<div class="pwd-input" style="position: relative;">
+<!-- 密码区同步缩小 padding -->
+<input type="password" value="********" disabled style="padding-right: 72px;">
+<span class="clickable-text inline-action-btn" onclick="enterEditState()">修改密码</span>
+</div>
+</div>
+</div>
+
+<!-- 修改密码编辑态：已删除用户名显示 -->
+<div id="editState" style="display: none;">
+<div class="form-group">
+<label>原密码</label>
+<div class="pwd-input">
+<input type="password" id="oldPwd" placeholder="请输入原密码" oninput="markUnsaved()">
+<button type="button" onclick="togglePwd('oldPwd')" title="显示/隐藏密码">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</button>
+</div>
+<div class="error-msg" id="oldPwdError"></div>
+</div>
+<div class="form-group">
+<label>新密码</label>
+<div class="pwd-input">
+<input type="password" id="newPwd" placeholder="请输入新密码" oninput="markUnsaved()">
+<button type="button" onclick="togglePwd('newPwd')" title="显示/隐藏密码">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</button>
+</div>
+<div class="error-msg" id="newPwdError"></div>
+</div>
+<div class="form-group">
+<label>确认新密码</label>
+<div class="pwd-input">
+<input type="password" id="confirmPwd" placeholder="请再次输入新密码" oninput="markUnsaved()">
+<button type="button" onclick="togglePwd('confirmPwd')" title="显示/隐藏密码">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</button>
+</div>
+<div class="error-msg" id="confirmPwdError"></div>
+</div>
+<div class="modal-footer">
+<button class="default-btn" onclick="cancelEdit()">取消</button>
+<button class="primary-btn" onclick="savePwdInfo()">保存</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ================= 二次确认弹窗 ================= -->
+<div class="modal-overlay" id="confirmModal" style="z-index: 1002;">
+<div class="modal-content" style="width: 300px;">
+<div class="modal-header">
+<h3>提示</h3>
+</div>
+<div class="modal-body">
+<p style="font-size: 14px; color: #1E293B;">有未保存的修改，确认要关闭吗？</p>
+<div class="modal-footer" style="margin-top: 24px;">
+<button class="default-btn" onclick="closeConfirmModal()">取消</button>
+<button class="primary-btn" onclick="forceCloseAccountModal()">确认关闭</button>
+</div>
+</div>
+</div>
+</div>
+<!-- ================= 附件上传弹窗 ================= -->
+<div class="modal-overlay" id="uploadModal">
+<div class="modal-content" style="width: 420px;">
+<div class="modal-header">
+<h3>上传文件</h3>
+<button class="close-btn" onclick="closeUploadModal()">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+</button>
+</div>
+<div class="modal-body" style="padding: 24px 20px;">
+<div class="upload-area">
+<svg class="icon icon-lg" style="margin-bottom: 8px;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+<div style="font-size: 14px; font-weight: 500; color: #1E293B;">点击或将文件拖拽到这里上传</div>
+<div style="font-size: 12px; margin-top: 6px; opacity: 0.7;">支持 PDF, DOCX, TXT, XLSX, PPT, Markdown (最大 50MB)</div>
+</div>
+</div>
+<div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid #E2E8F0; background: #F8FAFC; margin-top: 0;">
+<button class="default-btn" onclick="closeUploadModal()">取消</button>
+<button class="primary-btn" onclick="closeUploadModal()">确认上传</button>
+</div>
+</div>
+</div>
+<!-- ================= 设置信源弹窗 ================= -->
+<div class="modal-overlay" id="sourceModal">
+<div class="modal-content" style="width: 500px; max-height: 80vh;">
+<div class="modal-header">
+<h3>设置信源</h3>
+<button class="close-btn" onclick="closeSourceModal()">
+<svg class="icon icon-sm" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+</button>
+</div>
+<div class="modal-body" style="overflow-y: auto; padding: 20px; background: #F8FAFC;">
+<!-- 系统知识库列表截取自knowledge -->
+<div class="source-folder">
+<div class="source-folder-header">
+<input type="checkbox" id="sf1" onchange="toggleFolderDocs(this)">
+<label for="sf1" style="flex:1; cursor:pointer;">南海历史与领土争议</label>
+<span class="folder-tag tag-general">通用</span>
+</div>
+<div class="source-doc-list">
+<label class="source-doc-item"><input type="checkbox" onchange="updateFolderState(this)"> <span>1 南海问题的政策及国际法制度的演进.pdf</span></label>
+<label class="source-doc-item"><input type="checkbox" onchange="updateFolderState(this)"> <span>2 南海争端与国际法律机制的适用.pdf</span></label>
+</div>
+</div>
+<div class="source-folder">
+<div class="source-folder-header">
+<input type="checkbox" id="sf2" onchange="toggleFolderDocs(this)">
+<label for="sf2" style="flex:1; cursor:pointer;">国际法与南海争议解决机制</label>
+<span class="folder-tag tag-law">法律</span>
+</div>
+<div class="source-doc-list">
+<label class="source-doc-item"><input type="checkbox" onchange="updateFolderState(this)"> <span>1 南海问题的国际法解决路径.pdf</span></label>
+<label class="source-doc-item"><input type="checkbox" onchange="updateFolderState(this)"> <span>2 国际法与南海争端的和平解决.pdf</span></label>
+</div>
+</div>
+<div class="source-folder">
+<div class="source-folder-header">
+<input type="checkbox" id="sf3" onchange="toggleFolderDocs(this)">
+<label for="sf3" style="flex:1; cursor:pointer;">菲律宾政治体系</label>
+<span class="folder-tag tag-politics">政治</span>
+</div>
+<div class="source-doc-list">
+<label class="source-doc-item"><input type="checkbox" onchange="updateFolderState(this)"> <span>1 菲律宾政治体系概述.pdf</span></label>
+<label class="source-doc-item"><input type="checkbox" onchange="updateFolderState(this)"> <span>2 菲律宾政党政治生态塑造.pdf</span></label>
+</div>
+</div>
+</div>
+<div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid #E2E8F0; background: #FFFFFF; margin-top: 0;">
+<button class="primary-btn" onclick="closeSourceModal()">确认</button>
+</div>
+</div>
+</div>
+<script>
+// 侧边栏展开/收起核心逻辑及文案切换
+function toggleToolbar() {
+const tb = document.getElementById('toolbar');
+const toggleBtn = document.getElementById('sidebar-toggle-btn');
+tb.classList.toggle('expanded');
+// 动态修改提示文案
+if (tb.classList.contains('expanded')) {
+toggleBtn.title = "收起边栏";
+} else {
+toggleBtn.title = "展开边栏";
+}
+}
+// 历史任务列表展开/收起逻辑
+function toggleHistoryList() {
+const list = document.getElementById('history-list-container');
+const arrow = document.getElementById('history-arrow');
+if (list.style.display === 'none') {
+list.style.display = 'flex';
+arrow.classList.remove('collapsed');
+} else {
+list.style.display = 'none';
+arrow.classList.add('collapsed');
+}
+}
+// 新增：历史搜索输入框展示逻辑
+function toggleHistorySearch() {
+const searchBox = document.getElementById('history-search-box');
+if (searchBox.style.display === 'none') {
+searchBox.style.display = 'flex';
+searchBox.querySelector('input').focus();
+} else {
+searchBox.style.display = 'none';
+}
+}
+// 会话框输入联动逻辑
+document.addEventListener("DOMContentLoaded", function() {
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+// 监听输入框内容变化
+chatInput.addEventListener('input', function() {
+if (this.value.trim().length > 0) {
+sendBtn.disabled = false;
+} else {
+sendBtn.disabled = true;
+}
+});
+// 绑定跳转事件
+sendBtn.addEventListener('click', function() {
+if (!this.disabled) {
+window.location.href = 'config.html';
+}
+});
+});
+/* ================= 工具栏新增交互逻辑 ================= */
+// 联网按钮切换
+function toggleNetwork(el) {
+el.classList.toggle('active');
+const textSpan = el.querySelector('.net-text');
+if (el.classList.contains('active')) {
+textSpan.innerText = '已启用联网';
+} else {
+textSpan.innerText = '未启用联网';
+}
+}
+// 附件弹窗开关
+function openUploadModal() {
+document.getElementById('uploadModal').style.display = 'flex';
+}
+function closeUploadModal() {
+document.getElementById('uploadModal').style.display = 'none';
+}
+// 设置信源弹窗开关
+function openSourceModal() {
+document.getElementById('sourceModal').style.display = 'flex';
+}
+function closeSourceModal() {
+document.getElementById('sourceModal').style.display = 'none';
+}
+/* ================= 账号管理弹窗逻辑 ================= */
+let hasUnsavedChanges = false;
+let originalUsername = "admin";
+
+function markUnsaved() {
+hasUnsavedChanges = true;
+}
+
+function openAccountModal() {
+document.getElementById('accountModal').style.display = 'flex';
+document.getElementById('viewState').style.display = 'block';
+document.getElementById('editState').style.display = 'none';
+
+// 还原用户名展示及隐藏保存按钮
+const usernameInput = document.getElementById('editUsername');
+usernameInput.value = originalUsername;
+document.getElementById('saveUsernameBtn').style.display = 'none';
+
+hideToast();
+clearForm();
+hasUnsavedChanges = false;
+}
+
+function closeAccountModal() {
+if (hasUnsavedChanges) {
+document.getElementById('confirmModal').style.display = 'flex';
+} else {
+forceCloseAccountModal();
+}
+}
+function closeConfirmModal() {
+document.getElementById('confirmModal').style.display = 'none';
+}
+function forceCloseAccountModal() {
+closeConfirmModal();
+document.getElementById('accountModal').style.display = 'none';
+hasUnsavedChanges = false;
+}
+function enterEditState() {
+document.getElementById('viewState').style.display = 'none';
+document.getElementById('editState').style.display = 'block';
+clearFormErrors();
+hideToast();
+}
+function cancelEdit() {
+document.getElementById('viewState').style.display = 'block';
+document.getElementById('editState').style.display = 'none';
+clearForm();
+hideToast();
+
+// 重新评估用户名框是否还有未保存变更
+const currentUsername = document.getElementById('editUsername').value.trim();
+hasUnsavedChanges = (currentUsername !== originalUsername);
+}
+function togglePwd(inputId) {
+const input = document.getElementById(inputId);
+if (input.type === "password") {
+input.type = "text";
+} else {
+input.type = "password";
+}
+}
+function clearFormErrors() {
+document.getElementById('usernameError').innerText = '';
+document.getElementById('oldPwdError').innerText = '';
+document.getElementById('newPwdError').innerText = '';
+document.getElementById('confirmPwdError').innerText = '';
+}
+function clearForm() {
+document.getElementById('oldPwd').value = '';
+document.getElementById('newPwd').value = '';
+document.getElementById('confirmPwd').value = '';
+clearFormErrors();
+}
+
+// 修改成功后的 Toast 交互逻辑（与 Config 保持同款动画体验）
+let toastTimer = null;
+function showToast(msg) {
+const toast = document.getElementById('toastMessage');
+toast.innerText = msg;
+toast.classList.add('show');
+
+if(toastTimer) clearTimeout(toastTimer);
+toastTimer = setTimeout(() => {
+hideToast();
+}, 3000);
+}
+function hideToast() {
+const toast = document.getElementById('toastMessage');
+if (toast) toast.classList.remove('show');
+}
+
+// 监听用户名输入框修改状态
+function handleUsernameInput() {
+const inputEl = document.getElementById('editUsername');
+const saveBtn = document.getElementById('saveUsernameBtn');
+if (inputEl.value.trim() !== originalUsername) {
+saveBtn.style.display = 'block';
+markUnsaved(); // 标记有未保存更改
+} else {
+saveBtn.style.display = 'none';
+// 若处于非密码编辑态，将全局改变状态重置
+if (document.getElementById('editState').style.display === 'none') {
+hasUnsavedChanges = false;
+}
+}
+}
+
+// 用户名 回车直接保存
+function handleUsernameKey(e) {
+if (e.key === 'Enter') {
+document.getElementById('editUsername').blur();
+saveUsername();
+}
+}
+
+// 处理 用户名 的保存逻辑
+function saveUsername() {
+clearFormErrors();
+hideToast();
+const inputEl = document.getElementById('editUsername');
+const username = inputEl.value.trim();
+
+if (!username) {
+document.getElementById('usernameError').innerText = '请输入用户名';
+inputEl.value = originalUsername; // 校验失败恢复原名
+handleUsernameInput(); // 触发重新渲染状态
+return;
+}
+if (username === originalUsername) {
+return; // 没有变更则直接返回不弹窗
+}
+
+// 模拟服务端校验与保存
+setTimeout(() => {
+originalUsername = username;
+document.querySelector('.user-name').innerText = originalUsername;   // 同步更新侧边栏
+hasUnsavedChanges = false;
+document.getElementById('saveUsernameBtn').style.display = 'none';  // 隐藏保存按钮
+showToast('账号信息修改成功');
+}, 300);
+}
+
+// 处理 密码 保存逻辑
+function savePwdInfo() {
+clearFormErrors();
+hideToast();
+let isValid = true;
+const oldPwd = document.getElementById('oldPwd').value;
+const newPwd = document.getElementById('newPwd').value;
+const confirmPwd = document.getElementById('confirmPwd').value;
+
+if (!oldPwd) {
+document.getElementById('oldPwdError').innerText = '请输入原密码';
+isValid = false;
+}
+if (!newPwd) {
+document.getElementById('newPwdError').innerText = '请输入新密码';
+isValid = false;
+}
+if (!confirmPwd) {
+document.getElementById('confirmPwdError').innerText = '请输入确认新密码';
+isValid = false;
+}
+if (!isValid) return;
+
+if (newPwd !== confirmPwd) {
+document.getElementById('confirmPwdError').innerText = '两次输入的新密码不一致';
+isValid = false;
+}
+if (newPwd === oldPwd) {
+document.getElementById('newPwdError').innerText = '新密码不能与原密码相同';
+isValid = false;
+}
+if (newPwd.length < 6) {
+document.getElementById('newPwdError').innerText = '新密码不符合安全要求，请重新设置(至少6位)';
+isValid = false;
+}
+if (!isValid) return;
+
+// 模拟服务端校验与保存
+setTimeout(() => {
+// 演示原密码错误（假设输入123为错）
+if (oldPwd === '123') {
+document.getElementById('oldPwdError').innerText = '原密码错误，请重新输入';
+return;
+}
+
+hasUnsavedChanges = false;
+// 依次触发：恢复至查看态弹窗 -> 居中呼出成功提示
+cancelEdit();
+showToast('账号信息修改成功');
+}, 300);
+}
+
+/* ================= 信源弹窗复选框级联选择及高亮联动逻辑 ================= */
+// 核心检测函数：判断是否有信源被勾选，动态高亮按钮
+function checkSourceSelection() {
+const sourceBtn = document.getElementById('sourceBtn');
+const checkboxes = document.querySelectorAll('#sourceModal input[type="checkbox"]');
+let isAnyChecked = false;
+for (let i = 0; i < checkboxes.length; i++) {
+if (checkboxes[i].checked) {
+isAnyChecked = true;
+break;
+}
+}
+// 如果有被勾选的内容，按钮添加 active 实现黑白高亮；否则移除 active
+if (isAnyChecked) {
+sourceBtn.classList.add('active');
+} else {
+sourceBtn.classList.remove('active');
+}
+}
+function toggleFolderDocs(folderCb) {
+// 找到该大主题下的所有子文档复选框并同步状态
+const docList = folderCb.closest('.source-folder').querySelector('.source-doc-list');
+const childCbs = docList.querySelectorAll('input[type="checkbox"]');
+childCbs.forEach(cb => {
+cb.checked = folderCb.checked;
+});
+// 同步检测是否需要高亮“设置信源”按钮
+checkSourceSelection();
+}
+function updateFolderState(docCb) {
+// 点击子文档复选框时，反向更新其父级大主题复选框的状态
+const folder = docCb.closest('.source-folder');
+const folderCb = folder.querySelector('.source-folder-header input[type="checkbox"]');
+const childCbs = folder.querySelectorAll('.source-doc-list input[type="checkbox"]');
+const allChecked = Array.from(childCbs).every(cb => cb.checked);
+const someChecked = Array.from(childCbs).some(cb => cb.checked);
+folderCb.checked = allChecked;
+folderCb.indeterminate = someChecked && !allChecked;
+// 同步检测是否需要高亮“设置信源”按钮
+checkSourceSelection();
+}
+</script>
+</body>
+</html>

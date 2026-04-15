@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>登录 - DecisionOne</title>
+<style>
+:root {
+--primary-blue: #1A73E8;
+--primary-blue-light: #E8F0FE;
+--primary-black: #0F172A;    /* 更深的黑色，提升高级感 */
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+/* 现代 AI 工具风格：干净底色 + 隐约的光晕动感背景 */
+body {
+background: #F8FAFC;
+height: 100vh;
+display: flex;
+align-items: center;
+justify-content: center;
+color: #1E293B;
+-webkit-font-smoothing: antialiased;
+position: relative;
+overflow: hidden;
+z-index: 0;
+}
+/* 增加背景弥散光斑，营造 Manus/ChatGPT 的呼吸感 */
+body::before, body::after {
+content: '';
+position: absolute;
+border-radius: 50%;
+filter: blur(100px);
+z-index: -1;
+opacity: 0.6;
+}
+body::before {
+width: 500px;
+height: 500px;
+background: rgba(26, 115, 232, 0.15);    /* 柔和的纯正蓝光斑 */
+top: -100px;
+left: -100px;
+}
+body::after {
+width: 400px;
+height: 400px;
+background: rgba(147, 51, 234, 0.1);    /* 略带紫色的光斑，增加层次 */
+bottom: -100px;
+right: -50px;
+}
+/* 登录框采用微弱的毛玻璃效果与更柔和的阴影 */
+.login-box {
+background: rgba(255, 255, 255, 0.85);
+backdrop-filter: blur(20px);
+-webkit-backdrop-filter: blur(20px);
+padding: 48px 40px;
+border-radius: 20px;
+box-shadow: 0 10px 40px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8);
+width: 400px;
+text-align: center;
+border: 1px solid rgba(226, 232, 240, 0.6);
+}
+/* Logo 和文字改用深黑色，提升质感 */
+.logo {
+font-size: 28px;
+font-weight: 800;
+color: var(--primary-black);
+margin-bottom: 8px;
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 10px;
+letter-spacing: -0.5px;
+}
+.subtitle {
+font-size: 14px;
+color: #64748B;
+margin-bottom: 36px;
+letter-spacing: 2px;
+font-weight: 500;
+}
+.input-group { margin-bottom: 16px; text-align: left; }
+.nl-input { display: flex; width: 100%; position: relative; align-items: center; }
+.nl-input input {
+flex: 1;
+padding: 14px 16px;
+border: 1px solid #E2E8F0;
+border-radius: 12px;
+outline: none;
+background: rgba(250, 250, 251, 0.8);
+font-size: 14px;
+transition: all 0.2s ease;
+color: #1E293B;
+}
+.nl-input input:focus {
+border-color: var(--primary-blue);
+background: #FFFFFF;
+box-shadow: 0 0 0 4px var(--primary-blue-light);
+}
+/* 按钮样式微调 */
+.btn {
+width: 100%;
+padding: 14px;
+background: var(--primary-black);
+color: white;
+border: none;
+border-radius: 12px;
+font-size: 15px;
+font-weight: 600;
+cursor: pointer;
+margin-top: 12px;
+transition: all 0.2s ease;
+outline: none;
+}
+.btn:hover {
+background: #1E293B;
+box-shadow: 0 6px 16px rgba(15, 23, 42, 0.2);
+transform: translateY(-1px);
+}
+.icon {
+width: 28px;
+height: 28px;
+stroke: currentColor;
+stroke-width: 2.5;
+fill: none;
+stroke-linecap: round;
+stroke-linejoin: round;
+flex-shrink: 0;
+}
+/* 补充注册入口样式 */
+.register-area {
+margin-top: 24px;
+font-size: 13px;
+color: #64748B;
+}
+.register-area a {
+color: var(--primary-black);
+font-weight: 600;
+text-decoration: none;
+transition: color 0.2s;
+}
+.register-area a:hover {
+color: var(--primary-blue);
+text-decoration: underline;
+}
+/* === 表单校验与多模块切换样式 === */
+.view-section { display: none; }
+.view-section.active { display: block; }
+.error-msg { color: #EF4444; font-size: 12px; margin-top: 4px; display: none; }
+.error-msg:not(:empty) { display: block; }
+.global-error { color: #EF4444; font-size: 13px; margin-top: 4px; margin-bottom: 8px; text-align: center; display: none; }
+.global-error:not(:empty) { display: block; }
+.nl-input input.input-error { border-color: #EF4444 !important; background: #FEF2F2 !important; }
+.btn:disabled { background: #CBD5E1; color: #FFFFFF; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn:disabled:hover { background: #CBD5E1; box-shadow: none; transform: none; }
+/* === 注册成功弹窗样式 (高度更高、宽度更窄) === */
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+.modal-content { background: #FFFFFF; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow: hidden; }
+.success-modal { width: 280px; }  /* 宽度小一点 */
+.modal-body { padding: 48px 20px; text-align: center; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }  /* padding加大，让弹窗高一点 */
+.modal-footer { padding: 16px 20px; border-top: 1px solid #E2E8F0; background: #F8FAFC; display: flex; justify-content: center; }
+.primary-btn { background: var(--primary-black); color: #FFFFFF; border: none; padding: 10px 32px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; }
+.primary-btn:hover { background: #1E293B; box-shadow: 0 4px 12px rgba(15,23,42,0.15); }
+.success-icon { width: 52px; height: 52px; color: var(--primary-black); margin-bottom: 20px; stroke-width: 1.5; }
+.success-text { font-size: 16px; color: var(--primary-black); font-weight: 600; }
+.success-subtext { font-size: 13px; color: #64748B; margin-top: 8px; }
+
+/* ================== 新增：隐藏浏览器默认小钥匙、密码查看图标 ================== */
+input::-webkit-credentials-auto-fill-button,
+input::-webkit-contacts-auto-fill-button,
+input::-ms-reveal,
+input::-ms-clear {
+    display: none !important;
+    visibility: hidden !important;
+}
+</style>
+</head>
+<body>
+<div class="login-box">
+<!-- 图标与文字统一为黑色 -->
+<div class="logo">
+<svg class="icon" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+<path d="M8 18C4.686 18 2 15.314 2 12c0-3.314 2.686-6 6-6 2.5 0 4.8 1.5 5.5 3.5" />
+<path d="M16 6c3.314 0 6 2.686 6 6 0 3.314-2.686 6-6 6-2.5 0-4.8-1.5-5.5-3.5" />
+</svg>
+DecisionOne
+</div>
+<div class="subtitle">通用决策推演平台</div>
+<!-- 登录模块 -->
+<div id="login-view" class="view-section active">
+<div class="input-group">
+<div class="nl-input">
+<!-- 新增 autocomplete="off" 防止浏览器记住和填充用户名 -->
+<input type="text" id="login-account" placeholder="请输入用户名" value="admin" autocomplete="off">
+</div>
+<div class="error-msg" id="login-account-err"></div>
+</div>
+<div class="input-group">
+<div class="nl-input">
+<!-- 新增 autocomplete="new-password" 彻底阻断密码管理器保存和填充弹窗 -->
+<input type="password" id="login-password" placeholder="请输入密码" value="000000" autocomplete="new-password">
+</div>
+<div class="error-msg" id="login-password-err"></div>
+</div>
+<div class="global-error" id="login-global-err"></div>
+<!-- 默认包含填入信息，按钮初始可用 -->
+<button class="btn" id="login-btn">登 录</button>
+<div class="register-area">
+还没有账号？ <a href="javascript:void(0)" onclick="switchView('register')">立即注册</a>
+</div>
+</div>
+<!-- 注册模块 -->
+<div id="register-view" class="view-section">
+<div class="input-group">
+<div class="nl-input">
+<!-- 新增 autocomplete="off" -->
+<input type="text" id="reg-account" placeholder="请输入用户名" autocomplete="off">
+</div>
+<div class="error-msg" id="reg-account-err"></div>
+</div>
+<div class="input-group">
+<div class="nl-input">
+<!-- 新增 autocomplete="new-password" -->
+<input type="password" id="reg-password" placeholder="请输入密码" autocomplete="new-password">
+</div>
+<div class="error-msg" id="reg-password-err"></div>
+</div>
+<div class="input-group">
+<div class="nl-input">
+<!-- 新增 autocomplete="new-password" -->
+<input type="password" id="reg-confirm" placeholder="请再次输入密码" autocomplete="new-password">
+</div>
+<div class="error-msg" id="reg-confirm-err"></div>
+</div>
+<div class="global-error" id="reg-global-err"></div>
+<!-- 默认禁用状态 -->
+<button class="btn" id="reg-btn" disabled>注 册</button>
+<div class="register-area">
+已有账号？ <a href="javascript:void(0)" onclick="switchView('login')">返回登录</a>
+</div>
+</div>
+</div>
+<!-- ================= 注册成功提示弹窗 ================= -->
+<div class="modal-overlay" id="successModal">
+<div class="modal-content success-modal">
+<div class="modal-body">
+<svg class="success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+<polyline points="22 4 12 14.01 9 11.01"></polyline>
+</svg>
+<div class="success-text">注册成功</div>
+<div class="success-subtext">请前往登录使用系统</div>
+</div>
+<div class="modal-footer">
+<button class="primary-btn" onclick="closeSuccessModal()">前往登录</button>
+</div>
+</div>
+</div>
+<script>
+// --- 视图切换逻辑 ---
+function switchView(view) {
+document.getElementById('login-view').classList.remove('active');
+document.getElementById('register-view').classList.remove('active');
+document.getElementById(view + '-view').classList.add('active');
+// 切换时清空表单和错误信息
+clearAllErrors();
+document.getElementById('login-account').value = '';
+document.getElementById('login-password').value = '';
+document.getElementById('reg-account').value = '';
+document.getElementById('reg-password').value = '';
+document.getElementById('reg-confirm').value = '';
+checkLoginInput();
+checkRegInput();
+}
+// --- 统一错误处理逻辑 ---
+function clearAllErrors() {
+document.querySelectorAll('.error-msg, .global-error').forEach(el => el.innerText = '');
+document.querySelectorAll('input').forEach(el => el.classList.remove('input-error'));
+}
+function showError(id, msg, isGlobal = false, highlight = true) {
+document.getElementById(id).innerText = msg;
+// highlight参数控制是否添加红框样式（针对输入框为空时取消高亮的需求）
+if (!isGlobal && highlight) {
+const inputId = id.replace('-err', '');
+const inputEl = document.getElementById(inputId);
+if (inputEl) inputEl.classList.add('input-error');  // 触发输入框高亮
+}
+}
+function clearError(id, isGlobal = false) {
+document.getElementById(id).innerText = '';
+if (!isGlobal) {
+const inputId = id.replace('-err', '');
+const inputEl = document.getElementById(inputId);
+if (inputEl) inputEl.classList.remove('input-error');
+}
+}
+// --- 登录模块交互逻辑 ---
+const loginAccount = document.getElementById('login-account');
+const loginPassword = document.getElementById('login-password');
+const loginBtn = document.getElementById('login-btn');
+function checkLoginInput() {
+// 监听输入完整性，控制按钮点击
+loginBtn.disabled = !(loginAccount.value.trim() !== '' && loginPassword.value !== '');
+}
+// 输入时即时清除对应红框与报错
+loginAccount.addEventListener('input', () => { clearError('login-account-err'); clearError('login-global-err', true); checkLoginInput(); });
+loginPassword.addEventListener('input', () => { clearError('login-password-err'); clearError('login-global-err', true); checkLoginInput(); });
+// 失去焦点时校验为空 (按照需求，空值校验不触发高亮)
+loginAccount.addEventListener('blur', () => {
+if (loginAccount.value.trim() === '') showError('login-account-err', '请输入用户名', false, false);
+});
+loginPassword.addEventListener('blur', () => {
+if (loginPassword.value === '') showError('login-password-err', '请输入密码', false, false);
+});
+// 登录提交
+loginBtn.addEventListener('click', () => {
+if (loginBtn.disabled) return;
+const acc = loginAccount.value.trim();
+const pwd = loginPassword.value;
+clearAllErrors();
+// 模拟各项异常校验场景 [测试用]
+if (acc === 'unregistered') {
+showError('login-account-err', '该账号尚未注册，请先注册');
+} else if (acc === 'admin' && pwd === 'wrong') {
+showError('login-password-err', '密码错误，请重新输入');
+} else if (acc === 'admin' && pwd === 'wrong2') {
+showError('login-global-err', '账号或密码错误', true);
+} else if (acc === 'admin' && pwd === 'freq') {
+showError('login-global-err', '当前操作过于频繁，请稍后重试', true);
+} else if (acc === 'admin' && pwd === 'net') {
+showError('login-global-err', '网络异常，请检查网络后重试', true);
+} else if (acc === 'admin' && pwd === 'err') {
+showError('login-global-err', '登录失败，请稍后重试', true);
+} else {
+// 成功流 (含默认 admin / 000000 及其他成功放行)
+window.location.href = 'home.html';
+}
+});
+// --- 注册模块交互逻辑 ---
+const regAccount = document.getElementById('reg-account');
+const regPassword = document.getElementById('reg-password');
+const regConfirm = document.getElementById('reg-confirm');
+const regBtn = document.getElementById('reg-btn');
+function checkRegInput() {
+regBtn.disabled = !(regAccount.value.trim() !== '' && regPassword.value !== '' && regConfirm.value !== '');
+}
+regAccount.addEventListener('input', () => { clearError('reg-account-err'); checkRegInput(); });
+regPassword.addEventListener('input', () => { clearError('reg-password-err'); checkRegInput(); });
+regConfirm.addEventListener('input', () => { clearError('reg-confirm-err'); checkRegInput(); });
+regAccount.addEventListener('blur', () => {
+if (regAccount.value.trim() === '') showError('reg-account-err', '请输入用户名', false, false);
+});
+// 注册密码失去焦点校验 (密码长度校验)
+regPassword.addEventListener('blur', () => {
+if (regPassword.value === '') {
+showError('reg-password-err', '请输入密码', false, false);
+} else if (regPassword.value.length < 6) {
+showError('reg-password-err', '密码需至少6位，请重新设置');
+}
+});
+regConfirm.addEventListener('blur', () => {
+if (regConfirm.value === '') showError('reg-confirm-err', '请输入确认密码', false, false);
+});
+// 注册提交
+regBtn.addEventListener('click', () => {
+if (regBtn.disabled) return;
+const acc = regAccount.value.trim();
+const pwd = regPassword.value;
+const confirm = regConfirm.value;
+clearAllErrors();
+let isValid = true;
+if (acc === 'exist') {
+showError('reg-account-err', '账号已注册：不允许重复注册。');
+isValid = false;
+}
+// 密码长度校验阻断提交
+if (pwd.length < 6) {
+showError('reg-password-err', '密码需至少6位，请重新设置');
+isValid = false;
+}
+if (pwd !== confirm) {
+showError('reg-confirm-err', '两次密码不一致，请修正后再提交。');
+isValid = false;
+}
+if (isValid) {
+// 打开注册成功弹窗并保存账号备用
+window.tempRegAccount = acc;
+document.getElementById('successModal').style.display = 'flex';
+}
+});
+// 关闭弹窗并跳转回填账号
+function closeSuccessModal() {
+document.getElementById('successModal').style.display = 'none';
+switchView('login');
+if (window.tempRegAccount) {
+document.getElementById('login-account').value = window.tempRegAccount;
+}
+checkLoginInput();
+}
+// 初始化确保按钮状态与输入框初值同步
+document.addEventListener('DOMContentLoaded', () => {
+checkLoginInput();
+});
+</script>
+</body>
+</html>
